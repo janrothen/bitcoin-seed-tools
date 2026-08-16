@@ -4,10 +4,10 @@
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey.svg)
 ![Python](https://img.shields.io/badge/python-3.13%2B-blue)
 ![Status](https://img.shields.io/badge/status-unaudited%20%E2%80%94%20use%20at%20your%20own%20risk-orange)
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=janrothen_bitcoin-seed-tools&metric=alert_status)](https://sonarcloud.io/project/overview?id=janrothen_bitcoin-seed-tools)
-[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=janrothen_bitcoin-seed-tools&metric=bugs)](https://sonarcloud.io/project/overview?id=janrothen_bitcoin-seed-tools)
-[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=janrothen_bitcoin-seed-tools&metric=coverage)](https://sonarcloud.io/project/overview?id=janrothen_bitcoin-seed-tools)
-[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=janrothen_bitcoin-seed-tools&metric=security_rating)](https://sonarcloud.io/project/overview?id=janrothen_bitcoin-seed-tools)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=bitcoin-seed-tools&metric=alert_status)](https://sonarcloud.io/project/overview?id=bitcoin-seed-tools)
+[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=bitcoin-seed-tools&metric=bugs)](https://sonarcloud.io/project/overview?id=bitcoin-seed-tools)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=bitcoin-seed-tools&metric=coverage)](https://sonarcloud.io/project/overview?id=bitcoin-seed-tools)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=bitcoin-seed-tools&metric=security_rating)](https://sonarcloud.io/project/overview?id=bitcoin-seed-tools)
 
 A small collection of command-line tools for working with BIP-39 seed phrases. Everything runs locally on your own machine — there is no deployment, no network access, and no service to configure. The BIP-39 English wordlist ships with the repository in [assets/](assets), so the tools work fully offline.
 
