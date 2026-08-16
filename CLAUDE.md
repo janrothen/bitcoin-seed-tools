@@ -41,6 +41,22 @@ pip install -e ".[dev]"
 pytest
 ```
 
+CI does not install the extras this way. It installs `requirements-dev.txt` with
+`--only-binary :all: --require-hashes`, then the project itself with `--no-deps`
+(it has no runtime dependencies, so nothing is resolved). That file is generated
+— never hand-edit it, including its header. Change a dev dependency in
+`pyproject.toml` and regenerate in the same commit, or CI keeps running the old
+toolchain:
+
+```bash
+python3 -m venv .venv-lock && .venv-lock/bin/pip install pip-tools
+.venv-lock/bin/pip-compile --generate-hashes --extra dev --strip-extras \
+    --output-file requirements-dev.txt pyproject.toml
+```
+
+`pip-tools` is deliberately not a dev extra: it is needed to regenerate the pins,
+not to run the tests, and adding it would put it in its own output.
+
 ## Run
 ```bash
 python -m seed_tools lookup abandon
