@@ -3,10 +3,26 @@
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey.svg)
 ![Python](https://img.shields.io/badge/python-3.13%2B-blue)
+![Status](https://img.shields.io/badge/status-unaudited%20%E2%80%94%20use%20at%20your%20own%20risk-orange)
 
 A small collection of command-line tools for working with BIP-39 seed phrases. Everything runs locally on your own machine — there is no deployment, no network access, and no service to configure. The BIP-39 English wordlist ships with the repository in [assets/](assets), so the tools work fully offline.
 
 > **Security:** these tools are meant for throwaway or test seed phrases. Never type a seed phrase that holds funds into a machine that is online. See [Security](#security).
+
+## Disclaimer
+
+**This software is provided "as is", without warranty of any kind. Use it entirely at your own risk.**
+
+These tools operate on the secrets that control Bitcoin wallets. An error — in this software, in your transcription, or in your backup procedure — can make funds **permanently unrecoverable**. There is no undo, no recovery mechanism, and no support desk. This code has not been independently audited.
+
+- **No warranty.** The author makes no representation or guarantee that this software is correct, complete, secure, or fit for any particular purpose.
+- **No liability.** To the maximum extent permitted by applicable law, the author shall not be liable for any loss of funds, loss of data, or any other direct, indirect, incidental or consequential damages arising from the use of, or the inability to use, this software — even if advised of the possibility of such damage.
+- **Sole responsibility.** You alone are responsible for verifying that any output is correct before relying on it, for the security of the machine you run it on, and for your own backups.
+- **Not financial advice.** Nothing in this repository is a recommendation about how to custody assets or manage risk.
+
+Before trusting any output with a wallet that holds value: reproduce the result with an **independent implementation**, confirm the two agree, and rehearse the full backup-and-restore path with a worthless amount first.
+
+The warranty and liability terms in [LICENSE](LICENSE) govern your use of this software. This section summarises them for visibility; it does not replace or extend them.
 
 ## Requirements
 
@@ -121,6 +137,10 @@ pre-commit install
 Found a bug or have an idea? Open an issue or send a PR.
 Run `pytest` before submitting and keep changes focused.
 
+By submitting a contribution you agree that it is licensed under the same MIT terms as the rest of the project.
+
 ## License
 
 MIT © Jan Rothen — see [LICENSE](LICENSE) for details.
+
+The MIT terms include a disclaimer of warranty and a limitation of liability. See [Disclaimer](#disclaimer) for what that means in practice before using these tools with real funds.
