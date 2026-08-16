@@ -3,3 +3,9 @@
 file = "assets/bip-0039-english.txt"
 # Printable table: index, 11-bit binary, word (tab separated).
 printable_file = "assets/bip-0039-english-printable.txt"
+
+[tinyseed]
+# TinySeed plate table: number (1-2048), word, 12-bit binary, circles (tab separated).
+file = "assets/bip-0039-english-tinyseed.txt"
+# The official printable reference card from tinyseed.io.
+reference_file = "assets/bip-0039-tinyseed_io.pdf"
