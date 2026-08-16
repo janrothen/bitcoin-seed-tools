@@ -92,8 +92,16 @@ def test_wrong_checksum_rejected(words):
 
 def test_unknown_word_rejected(words):
     phrase = " ".join(["abandon"] * 23 + ["bitcoin"])
-    with pytest.raises(ValueError, match="Not a BIP-39 word"):
+    with pytest.raises(ValueError, match="Word 24 is not a BIP-39 word"):
         to_entropy(phrase, words)
+
+
+def test_unknown_word_error_does_not_repeat_the_word(words):
+    """The position is the diagnostic; the word itself is a piece of a backup."""
+    phrase = " ".join(["abandon"] * 23 + ["bitcoin"])
+    with pytest.raises(ValueError) as caught:
+        to_entropy(phrase, words)
+    assert "bitcoin" not in str(caught.value)
 
 
 def test_bad_word_count_rejected(words):

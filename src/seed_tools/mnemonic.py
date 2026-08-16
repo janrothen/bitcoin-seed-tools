@@ -41,7 +41,7 @@ def to_entropy(phrase: str | Sequence[str], words: Wordlist | None = None) -> by
         raise ValueError(
             f"Seed phrase must be {_options(WORD_COUNTS)} words, got {len(mnemonic)}"
         )
-    bits = "".join(words.binary(word) for word in mnemonic)
+    bits = "".join(_binary(words, mnemonic))
     split = entropy_bits(len(mnemonic))
     entropy = int(bits[:split], 2).to_bytes(split // 8, "big")
     if bits[split:] != checksum_bits(entropy):
@@ -79,6 +79,22 @@ def xor_entropy(parts: Sequence[bytes]) -> bytes:
         for position, byte in enumerate(part):
             combined[position] ^= byte
     return bytes(combined)
+
+
+def _binary(words: Wordlist, mnemonic: Sequence[str]) -> list[str]:
+    """Each word as 11 bits, reporting the position of the first unknown one.
+
+    The position, never the word: this error is logged, and what was typed here
+    is someone's seed backup. Where it went wrong is what the reader needs
+    anyway — they have the words in front of them.
+    """
+    bits = []
+    for position, word in enumerate(mnemonic, start=1):
+        try:
+            bits.append(words.binary(word))
+        except ValueError:
+            raise ValueError(f"Word {position} is not a BIP-39 word") from None
+    return bits
 
 
 def _to_bits(data: bytes) -> str:

@@ -157,6 +157,17 @@ silent toe meat …
 
 A blank line ends the list. One plate holds 12 rows, so a 24-word phrase runs across two of them — keep going past row 12 and finish with a blank line there instead.
 
+Stopping at exactly 12 rows is the one ambiguous case, so it takes a second blank line to confirm:
+
+```
+Row 13 (blank to finish):
+— 12 rows read, which is one full plate. A 24-word phrase spans two: carry on
+with the next plate, or press Enter again to finish here.
+Row 13 (blank to finish):
+```
+
+That is there because row 12 is where you put one plate down and pick up the next, and an Enter pressed in that pause would otherwise end the read at twelve words — which pass the checksum roughly once in sixteen and would then be printed as though they were the whole phrase.
+
 Since `●` and `○` are not on a keyboard, a row may be written any of these ways, and they may be mixed within a row:
 
 | Position | Accepted marks |
@@ -215,9 +226,21 @@ ERROR seed_tools.cli: Part 2: Invalid checksum — check the words and their ord
 
 Add `--entropy` to also print the combined entropy as hex, which is useful for cross-checking against another implementation.
 
+```bash
+seed-tools xor --stdin < parts.txt
+```
+
+Piped like this the file's own end is what stops the read, so a blank line in it is only the gap between two parts and is skipped — write the parts out spaced apart if that is how you keep them. (Typed at the prompt there is no end-of-file to wait for, so there a blank line still ends the list.) Before the result, the tool reports on stderr what it actually combined:
+
+```
+Combined 3 parts of 24 words.
+```
+
+Check that line. A part that was stored wrapped across two lines reads as two shorter parts rather than one, and the phrase that comes out of that carries a perfectly valid checksum — the counts are what give it away.
+
 All parts must have the same word count. The command refuses to emit a result when the parts cancel each other out, and exits with status `2` on any bad input. Prompts and errors go to stderr and the result to stdout, so redirecting stdout captures the phrase and nothing else. Ctrl-C or Ctrl-D at a prompt aborts without printing a result.
 
-> **This is not a threshold backup.** Every part is required forever — lose one and the wallet is gone. Any subset of parts reveals nothing about the result, which is exactly why you must never store a part alongside the combined phrase.
+> **This is not a threshold backup.** Every part is required forever — lose one and the wallet is gone. Provided the part you are missing is genuinely random and independent of the others, no subset of the remaining parts reveals anything about the result — which is exactly why you must never store a part alongside the combined phrase. That guarantee is only as good as that independence: parts derived from each other, or from the same weak source, do not give it.
 
 ### Adding a tool
 
@@ -269,7 +292,8 @@ pre-commit install
 | `FileNotFoundError: config.toml` | Installed non-editable without setting `BITCOIN_SEED_TOOLS_HOME` — export it, pointing at the repository root |
 | `FileNotFoundError` on a file in `assets/` | `config.toml` points at a path that does not exist, or the repository was copied without `assets/` |
 | `ValueError: Wordlist must contain 2048 words` | The wordlist file was edited or truncated — restore it from git |
-| `Not a BIP-39 word` | The word is not in the English wordlist; BIP-39 words are lowercase and unaccented |
+| `Word N is not a BIP-39 word` | Word `N` of that phrase is not in the English wordlist; BIP-39 words are lowercase and unaccented. The word itself is deliberately not repeated back — errors reach a log, and a word typed at a seed prompt does not belong in one |
+| `Wordlist contains duplicate words` / `Wordlist is not in sorted order` | The wordlist file was edited or replaced — restore it from git. Both corruptions keep the file at 2048 lines and would otherwise silently produce phrases no other wallet reproduces |
 | `no match` for a valid-looking number | Indices are 0-based and stop at 2047 |
 | `Part N: Invalid checksum` | A word in part `N` is wrong or out of order — the last word encodes a checksum over all the others, so re-read that part carefully |
 | `Aborted — no result was produced` | Ctrl-C or Ctrl-D was pressed at a prompt; nothing was combined or printed |
