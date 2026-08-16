@@ -30,7 +30,12 @@ class Wordlist:
 
     @classmethod
     def from_file(cls, path: Path) -> "Wordlist":
-        words = path.read_text(encoding="utf-8").split()
+        try:
+            words = path.read_text(encoding="utf-8").split()
+        except OSError as error:
+            # Same reasoning as `config._load`: a missing asset is bad input,
+            # reported through `cli.main`, never a traceback.
+            raise ValueError(f"Cannot read wordlist: {error}") from None
         return cls(words)
 
     def __len__(self) -> int:
@@ -66,4 +71,10 @@ class Wordlist:
 @cache
 def wordlist() -> Wordlist:
     """The English wordlist configured in config.toml (loaded once)."""
-    return Wordlist.from_file(asset(config()["wordlist"]["file"]))
+    try:
+        file = config()["wordlist"]["file"]
+    except KeyError as error:
+        raise ValueError(
+            f"config.toml is missing the {error} entry that locates the wordlist"
+        ) from None
+    return Wordlist.from_file(asset(file))

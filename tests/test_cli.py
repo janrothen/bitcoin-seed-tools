@@ -44,6 +44,26 @@ def test_lookup_by_prefix_lists_all_matches(capsys):
     assert capsys.readouterr().out.count("\n") == 1
 
 
+def test_lookup_of_a_word_that_prefixes_others_lists_them_all(capsys):
+    """`car` is a word, but a smudged backup needs carbon..cart offered too."""
+    assert main(["lookup", "car"]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[0].endswith("  car")
+    assert len(lines) == 7  # car, carbon, card, cargo, carpet, carry, cart
+
+
+def test_lookup_of_an_empty_term_reports_no_match(capsys):
+    """Every word starts with "" — an unset shell variable must not match all."""
+    assert main(["lookup", ""]) == 1
+    assert "no match" in capsys.readouterr().out
+
+
+def test_lookup_of_an_absurdly_long_index_reports_no_match(capsys):
+    """Past CPython's int-parsing limit; out of range either way."""
+    assert main(["lookup", "9" * 5000]) == 1
+    assert "no match" in capsys.readouterr().out
+
+
 def test_unknown_term_reports_and_exits_nonzero(capsys):
     assert main(["lookup", "bitcoin"]) == 1
     assert "no match" in capsys.readouterr().out
@@ -466,6 +486,21 @@ def test_tinyseed_reverse_says_why_it_kept_prompting_at_the_seam(capsys, monkeyp
     assert "one full plate" in capsys.readouterr().err
 
 
+def test_tinyseed_reverse_does_not_end_a_typed_list_at_eof_at_the_seam(
+    capsys, monkeypatch
+):
+    """Ctrl-D while reaching for the second plate must not end the read either.
+
+    `readline` returns "" for Ctrl-D at a prompt, which must face the same seam
+    check as a stray Enter — the truncated read it would otherwise allow passes
+    the checksum once in sixteen and prints as a clean 12-word phrase.
+    """
+    rows = _plate(XOR_24_RESULT)
+    _rows(monkeypatch, *rows[:12], "", *rows[12:])
+    assert main(["tinyseed", "--reverse"]) == 0
+    assert capsys.readouterr().out.splitlines()[-1] == XOR_24_RESULT
+
+
 @pytest.mark.parametrize("style", sorted(tinyseed.STYLES))
 def test_tinyseed_reverse_reads_any_notation(capsys, monkeypatch, style):
     _feed(monkeypatch, *_plate(XOR_12_PARTS[0], style))
@@ -519,6 +554,9 @@ def test_tinyseed_reverse_says_which_row_it_could_not_read(monkeypatch, caplog):
     assert main(["tinyseed", "--reverse", "--stdin"]) == 2
     assert "Row 3:" in caplog.text
     assert "position 5" in caplog.text
+    # The position, never the mark: what was really typed could be a fragment
+    # of a seed phrase fed to the wrong tool, and this error is logged.
+    assert "q" not in caplog.text
 
 
 def test_tinyseed_reverse_rejects_a_row_with_a_hole_miscounted(monkeypatch, caplog):

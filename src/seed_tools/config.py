@@ -15,8 +15,17 @@ _config: dict | None = None
 
 
 def _load() -> dict:
-    with open(_PROJECT_ROOT / "config.toml", "rb") as f:
-        return tomllib.load(f)
+    path = _PROJECT_ROOT / "config.toml"
+    try:
+        with open(path, "rb") as f:
+            return tomllib.load(f)
+    except OSError as error:
+        # A missing or unreadable config is bad input to the process, not a
+        # crash: raise the ValueError that `cli.main` reports like any other.
+        raise ValueError(
+            f"Cannot read {path}: {error} — set BITCOIN_SEED_TOOLS_HOME to the "
+            "directory that holds config.toml and assets/"
+        ) from None
 
 
 def config() -> dict:
