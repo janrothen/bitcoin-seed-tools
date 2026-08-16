@@ -80,6 +80,20 @@ seed-tools lookup 2047
 
 `BITCOIN_SEED_TOOLS_HOME` tells the tools where `config.toml` and `assets/` live. It is only needed for a regular (non-editable) install — an editable dev install finds the project root on its own.
 
+### Running offline
+
+`pip install .` wants the network. Not for this project — it has no runtime dependencies — but for the build: pip fetches the `hatchling` build backend from PyPI before it can build the wheel. On an air-gapped machine that step fails, which is exactly where you should be running these tools.
+
+Do not install anything. Run from the extracted source instead:
+
+```bash
+PYTHONPATH=src python3 -m seed_tools lookup abandon
+```
+
+No virtualenv, no pip, nothing to build. `config.toml` and `assets/` are found relative to the source tree, so `BITCOIN_SEED_TOOLS_HOME` is not needed either. Export `PYTHONPATH=$PWD/src` once and every example below works with `python3 -m seed_tools` in place of `seed-tools`.
+
+Building a wheel on a connected machine and carrying it across also works, but it buys only the shorter command name — you would still copy `config.toml` and `assets/` over and set `BITCOIN_SEED_TOOLS_HOME`, and you would have one more binary artifact to account for on a machine that handles real phrases.
+
 ## Tools
 
 ### `lookup`
@@ -373,7 +387,8 @@ pre-commit install
 | `Row N: Pattern is past the end of the wordlist` | Position 1 of row `N` was read as punched, and only `zoo` has that hole — most likely the row was shifted by one, so check where it starts |
 | `Invalid checksum` from `--reverse` | The plate does not say what you meant it to: one row is misread, or a hole really is in the wrong place. Re-read each row against [assets/bip-0039-english-tinyseed.txt](assets/bip-0039-english-tinyseed.txt) before trusting the plate |
 | `command not found: seed-tools` | The virtualenv is not activated, or the package was installed elsewhere — run `source .venv/bin/activate` |
-| `ModuleNotFoundError: No module named 'seed_tools'` | Running `python -m seed_tools` outside the venv, or the package was never installed — run `pip install -e .` |
+| `ModuleNotFoundError: No module named 'seed_tools'` | Running `python -m seed_tools` outside the venv, or the package was never installed — run `pip install -e .`, or set `PYTHONPATH=src` and skip installing |
+| `No matching distribution found for hatchling` | `pip install` is downloading its build backend and the machine has no network. Nothing here needs installing — run from source, see [Running offline](#running-offline) |
 
 ## Contributing
 
