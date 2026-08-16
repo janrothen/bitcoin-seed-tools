@@ -660,6 +660,122 @@ def test_tinyseed_reverse_aborts_cleanly_on_interrupt(capsys, monkeypatch, caplo
     assert capsys.readouterr().out == ""
 
 
+def test_checksum_lists_every_valid_final_word(capsys, monkeypatch):
+    _feed(monkeypatch, " ".join(XOR_12_RESULT.split()[:11]))
+    assert main(["checksum", "--stdin"]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert len(lines) == 128
+    assert XOR_12_RESULT.split()[-1] in [line.split()[1] for line in lines]
+
+
+def test_checksum_of_a_23_word_phrase_offers_eight_words(capsys, monkeypatch):
+    _feed(monkeypatch, " ".join(XOR_24_RESULT.split()[:23]))
+    assert main(["checksum", "--stdin"]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert len(lines) == 8
+    assert XOR_24_RESULT.split()[-1] in [line.split()[1] for line in lines]
+
+
+def test_checksum_candidates_are_numbered_from_zero(capsys, monkeypatch):
+    """The number is the value to draw, not a position in the phrase."""
+    _feed(monkeypatch, " ".join(XOR_24_RESULT.split()[:23]))
+    assert main(["checksum", "--stdin"]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert [int(line.split()[0]) for line in lines] == list(range(8))
+
+
+def test_checksum_candidates_complete_a_phrase_the_tools_accept(capsys, monkeypatch):
+    """Feed each completion back to a tool that verifies the checksum itself."""
+    head = XOR_24_RESULT.split()[:23]
+    _feed(monkeypatch, " ".join(head))
+    assert main(["checksum", "--stdin"]) == 0
+    for line in capsys.readouterr().out.splitlines():
+        _feed(monkeypatch, " ".join([*head, line.split()[1]]))
+        assert main(["tinyseed", "--stdin"]) == 0
+
+
+def test_checksum_reports_the_word_count_it_read(capsys, monkeypatch):
+    """A phrase that lost or gained a word can still be an accepted length."""
+    _feed(monkeypatch, " ".join(XOR_12_RESULT.split()[:11]))
+    assert main(["checksum", "--stdin"]) == 0
+    assert "11 words read; 128 valid final words." in capsys.readouterr().err
+
+
+def test_checksum_says_the_last_word_is_a_choice_of_entropy(capsys, monkeypatch):
+    """Taking the first candidate every time throws the free bits away."""
+    _feed(monkeypatch, " ".join(XOR_12_RESULT.split()[:11]))
+    assert main(["checksum", "--stdin"]) == 0
+    assert "7 bits of entropy" in capsys.readouterr().err
+
+
+def test_checksum_reads_a_phrase_wrapped_across_lines(capsys, monkeypatch):
+    """All of stdin is the phrase — a backup may be written however it fits."""
+    head = XOR_24_RESULT.split()[:23]
+    _feed(monkeypatch, " ".join(head[:12]), " ".join(head[12:]))
+    assert main(["checksum", "--stdin"]) == 0
+    assert len(capsys.readouterr().out.splitlines()) == 8
+
+
+def test_checksum_rejects_a_complete_phrase(monkeypatch, caplog):
+    _feed(monkeypatch, XOR_12_RESULT)
+    assert main(["checksum", "--stdin"]) == 2
+    assert "must be 11, 14, 17, 20 or 23 words" in caplog.text
+    assert "every word but the last" in caplog.text
+
+
+def test_checksum_rejects_a_mistyped_word(monkeypatch, caplog):
+    words = XOR_12_RESULT.split()[:11]
+    words[0] = "cannonn"
+    _feed(monkeypatch, " ".join(words))
+    assert main(["checksum", "--stdin"]) == 2
+    assert "Word 1 is not a BIP-39 word" in caplog.text
+    # Errors reach a log, and what was typed at a seed prompt stays out of it.
+    assert "cannonn" not in caplog.text
+
+
+def test_checksum_prompts_without_echo_on_a_terminal(capsys, monkeypatch):
+    prompts = _prompts(monkeypatch, " ".join(XOR_12_RESULT.split()[:11]))
+    assert main(["checksum"]) == 0
+    assert prompts == ["Seed phrase without its last word: "]
+    assert len(capsys.readouterr().out.splitlines()) == 128
+
+
+def test_checksum_refuses_a_non_terminal_without_the_stdin_flag(monkeypatch, caplog):
+    monkeypatch.setattr("seed_tools.phrase_input.stdin_is_tty", lambda: False)
+    assert main(["checksum"]) == 2
+    assert "not a terminal" in caplog.text
+    # One phrase, so it must not promise xor's line-per-phrase format.
+    assert "the whole phrase from stdin" in caplog.text
+    assert "per line" not in caplog.text
+
+
+def test_checksum_refuses_the_stdin_flag_at_a_terminal(monkeypatch, caplog):
+    """Typed under --stdin, a phrase would be echoed into scrollback."""
+    monkeypatch.setattr("seed_tools.phrase_input.stdin_is_tty", lambda: True)
+    assert main(["checksum", "--stdin"]) == 2
+    assert "stdin is a terminal" in caplog.text
+    assert "drop --stdin" in caplog.text
+
+
+def test_checksum_prompts_on_stderr_with_the_stdin_flag(capsys, monkeypatch):
+    _feed(monkeypatch, " ".join(XOR_12_RESULT.split()[:11]))
+    assert main(["checksum", "--stdin"]) == 0
+    captured = capsys.readouterr()
+    assert captured.err.startswith("Seed phrase without its last word: ")
+    # The prompt stays out of stdout, which carries the candidates.
+    assert "Seed phrase" not in captured.out
+
+
+def test_checksum_aborts_cleanly_on_interrupt(capsys, monkeypatch, caplog):
+    monkeypatch.setattr("seed_tools.phrase_input.stdin_is_tty", lambda: True)
+    monkeypatch.setattr(
+        "seed_tools.phrase_input.read_line_hidden", _raise(KeyboardInterrupt)
+    )
+    assert main(["checksum"]) == 2
+    assert "Aborted" in caplog.text
+    assert capsys.readouterr().out == ""
+
+
 def _plate(phrase: str, style: str = tinyseed.DEFAULT_STYLE) -> list[str]:
     """The rows a punched plate shows for a phrase, as they are read back off it."""
     return [tinyseed.dots(word, style) for word in phrase.split()]

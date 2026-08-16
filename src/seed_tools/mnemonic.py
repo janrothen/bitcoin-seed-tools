@@ -12,6 +12,9 @@ ENTROPY_SIZES = (16, 20, 24, 28, 32)
 WORD_COUNTS = (12, 15, 18, 21, 24)
 CHECKSUM_DIVISOR = 32
 
+# A phrase one word short of any valid length — what `final_words` completes.
+PARTIAL_WORD_COUNTS = tuple(count - 1 for count in WORD_COUNTS)
+
 MIN_PARTS = 2
 
 
@@ -61,6 +64,54 @@ def from_entropy(entropy: bytes, words: Wordlist | None = None) -> list[str]:
         words.word(int(bits[start : start + INDEX_BITS], 2))
         for start in range(0, len(bits), INDEX_BITS)
     ]
+
+
+def final_word_entropy_bits(word_count: int) -> int:
+    """How many entropy bits the last word of a phrase carries, beside the checksum.
+
+    `word_count` is the length of the finished phrase. The rest of the word's 11
+    bits are the checksum, so this is never 0: the last word is not a checksum
+    word, and the choice of which one to use is a choice of entropy.
+    """
+    return entropy_bits(word_count) - (word_count - 1) * INDEX_BITS
+
+
+def final_words(
+    phrase: str | Sequence[str], words: Wordlist | None = None
+) -> list[str]:
+    """Every last word that completes a phrase with a valid checksum, sorted.
+
+    The last word is not a checksum on its own. Only its trailing ENT/32 bits
+    are; the ones before them are the final bits of the entropy. So a phrase one
+    word short has 2**`final_word_entropy_bits` completions — 128 for a 12-word
+    phrase, 8 for a 24-word one — and each is a valid phrase for a *different*
+    wallet. Which one to take is the caller's problem, not this function's.
+    """
+    words = wordlist() if words is None else words
+    mnemonic = normalize(phrase)
+    if len(mnemonic) not in PARTIAL_WORD_COUNTS:
+        raise ValueError(
+            f"Seed phrase must be {_options(PARTIAL_WORD_COUNTS)} words — every "
+            f"word but the last — got {len(mnemonic)}"
+        )
+    word_count = len(mnemonic) + 1
+    prefix = "".join(_binary(words, mnemonic))
+    split = entropy_bits(word_count)
+    # The same count the tools quote as coin flips, from the same expression —
+    # a list of 2**missing candidates and the advice on how to draw one of them
+    # cannot end up describing different numbers of bits.
+    missing = final_word_entropy_bits(word_count)
+    # Each candidate is built by encoding a whole phrase and keeping its last
+    # word, rather than assembling that word from the tail bits and a checksum
+    # here. The completions then come off exactly the path that encodes every
+    # other phrase in this project, so they cannot drift away from it.
+    return sorted(
+        from_entropy(
+            int(prefix + format(tail, f"0{missing}b"), 2).to_bytes(split // 8, "big"),
+            words,
+        )[-1]
+        for tail in range(1 << missing)
+    )
 
 
 def xor_entropy(parts: Sequence[bytes]) -> bytes:

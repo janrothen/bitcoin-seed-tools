@@ -45,6 +45,7 @@ src/seed_tools/
     tinyseed.py          # TinySeed plates: word ↔ 12-bit punch pattern
     phrase_input.py      # reading a phrase from a terminal without echoing it
     tools/
+        checksum.py      # `checksum` subcommand
         lookup.py        # `lookup` subcommand
         tinyseed.py      # `tinyseed` subcommand
         xor.py           # `xor` subcommand
@@ -93,6 +94,50 @@ seed-tools lookup abandon 42 zeb
 ```
 
 Unknown terms print `no match`; like `grep`, the command exits with status `1` only when no term matched at all. Terms are matched lowercase, the way BIP-39 words are written.
+
+### `checksum`
+
+Complete a seed phrase: give it every word but the last, and it lists the final words that make the BIP-39 checksum come out right. Use it when you generated your own entropy — dice, coin flips, a deck of cards — and have 11 or 23 words with no way to compute the last one by hand.
+
+```bash
+seed-tools checksum
+```
+
+The tool prompts once, without echoing, and prints the candidates:
+
+```
+Seed phrase without its last word:
+23 words read; 8 valid final words.
+Each completes a different wallet. The last word carries 3 bits of entropy besides the checksum, so pick a number at random (3 coin flips) rather than taking the first.
+  0  buddy
+  1  cash
+  …
+  7  vote
+```
+
+**There is always more than one, and the choice is yours to make properly.** Only the trailing bits of the last word are the checksum — the ones before them are the final bits of your entropy. So a 23-word phrase has 8 valid endings and an 11-word one has 128, and every candidate is a valid phrase for a *completely different wallet*.
+
+| Words given | Candidates | Entropy bits in the last word |
+| --- | --- | --- |
+| 11 | 128 | 7 |
+| 14 | 64 | 6 |
+| 17 | 32 | 5 |
+| 20 | 16 | 4 |
+| 23 | 8 | 3 |
+
+That is why the candidates are numbered **from 0**, unlike the word positions the other tools print: the number is the value to draw, and the draw is exactly as many bits as the last word is worth. Flip a coin 3 times for a 23-word phrase, 7 times for an 11-word one, and take the number that comes up. Always taking the first candidate — or the one that reads nicest — throws those bits away and hands them to anyone who guesses the habit.
+
+The same list answers the other question people ask it: *which last word did I have?* If a backup lost its final word, these are the only words it could have been, and each one needs trying against the wallet you expect. The tool cannot narrow it further — nothing in the phrase records which one you used.
+
+Like the other phrase tools, the words are never taken from the command line, and `--stdin` reads the whole of stdin as one phrase, so a backup may wrap however it happens to be written:
+
+```bash
+seed-tools checksum --stdin < first-23-words.txt
+```
+
+The count on stderr is worth reading. A file that lost or gained a word can still land on an accepted length, and the candidates look exactly as convincing either way — the count is what gives it away. Prompts and errors go to stderr and the candidates to stdout.
+
+> Verify before the wallet holds anything. Feed the completed phrase back through `seed-tools tinyseed` (or any wallet) and confirm it is accepted — that is a second, independent check on the word you picked.
 
 ### `tinyseed`
 
@@ -292,7 +337,7 @@ pre-commit install
 - Never enter a seed phrase that controls real funds on an internet-connected machine. Use an offline machine, or use test phrases only.
 - The tools never write a seed phrase to disk and never make network calls — but your shell does keep a history file. Clear it (or prefix commands with a space) after working with real words.
 - Never commit anything containing a real seed phrase. Nothing scans for that automatically — treat every test vector you add as public. The phrases in [tests/vectors.py](tests/vectors.py) are published specification vectors and are already compromised.
-- `xor` and `tinyseed` never echo a phrase you type and never write it anywhere. The one exception is `tinyseed --reverse`, which echoes the rows of holes on purpose so you can proofread them — it is still a secret on your screen, so read a plate back somewhere nobody is looking. Either way, **Python cannot reliably wipe a phrase from process memory** — strings are immutable and may be copied by the interpreter or paged to swap. Treat the machine as contaminated afterwards: use an offline system and power it off when you are done.
+- `xor`, `tinyseed` and `checksum` never echo a phrase you type and never write it anywhere. The one exception is `tinyseed --reverse`, which echoes the rows of holes on purpose so you can proofread them — it is still a secret on your screen, so read a plate back somewhere nobody is looking. Either way, **Python cannot reliably wipe a phrase from process memory** — strings are immutable and may be copied by the interpreter or paged to swap. Treat the machine as contaminated afterwards: use an offline system and power it off when you are done.
 - Seed XOR has two uses with opposite backup rules — see [`xor`](#xor) before you throw anything away. If you are *splitting* a seed, every part is required forever, none of them may sit beside the combined phrase, and it is all-of-n rather than a threshold scheme. If you combined parts only to *generate* a seed that you then back up in full, the parts are scratch work and destroying them is the right move — but verify the backup first, because it becomes the only copy.
 
 ## Troubleshooting
@@ -308,10 +353,12 @@ pre-commit install
 | `Part N: Invalid checksum` | A word in part `N` is wrong or out of order — the last word encodes a checksum over all the others, so re-read that part carefully |
 | `Aborted — no result was produced` | Ctrl-C or Ctrl-D was pressed at a prompt; nothing was combined or printed |
 | `Seed phrase must be 12, 15, 18, 21 or 24 words` | A word was dropped or duplicated while typing the part |
+| `Seed phrase must be 11, 14, 17, 20 or 23 words` | `checksum` completes a phrase, so it wants every word *but* the last — pass 23 words to get the 24th, not 24 |
+| `checksum` lists more than one word | Correct, and not a bug: the last word carries entropy as well as the checksum. Pick one at random — see [`checksum`](#checksum) |
 | `All parts must have the same word count` | Mixing a 12-word and a 24-word part — `xor` needs them the same length |
 | `Need at least 2 parts to XOR` | The list was ended with a blank line too early; enter at least two phrases |
 | `Parts cancel out` | Two parts are identical, or one equals the XOR of the others — the extra parts add no entropy, so use independent ones |
-| `stdin is not a terminal` | `xor` or `tinyseed` was piped or run from a script — pass `--stdin`. `xor` reads one phrase per line; `tinyseed` reads the whole of stdin as one phrase, and `tinyseed --reverse` one plate row per line |
+| `stdin is not a terminal` | A phrase tool was piped or run from a script — pass `--stdin`. `xor` reads one phrase per line; `tinyseed` and `checksum` read the whole of stdin as one phrase, and `tinyseed --reverse` one plate row per line |
 | `stdin is a terminal` | `--stdin` reads a pipe or a file, and typing at a terminal would echo the phrase into scrollback — drop the flag to be prompted with input hidden |
 | `tinyseed` circles look doubled or misaligned | The terminal renders `●`/`○` at double width (they are East Asian *Ambiguous*) — use `--style binary` |
 | A `tinyseed` number is one higher than `lookup` says | Correct: TinySeed numbers the wordlist 1–2048, `lookup` uses the BIP-39 index 0–2047 |
