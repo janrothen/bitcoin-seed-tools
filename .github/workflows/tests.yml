@@ -25,7 +25,7 @@ jobs:
           # Wheels only, so no sdist setup script runs during install, and
           # hash-checked, so a pinned version cannot be served as a different
           # artifact than the one this commit was locked against.
-          pip install --only-binary :all: --require-hashes -r requirements-dev.txt
+          pip install --only-binary :all: --require-hashes --no-deps -r requirements-dev.txt
           # The project itself has no runtime dependencies, so nothing is
           # resolved here — this only puts src/ on the path.
           pip install -e . --no-deps
