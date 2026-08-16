@@ -1,0 +1,5 @@
+[wordlist]
+# BIP-39 English wordlist: 2048 words, one per line.
+file = "assets/bip-0039-english.txt"
+# Printable table: index, 11-bit binary, word (tab separated).
+printable_file = "assets/bip-0039-english-printable.txt"
