@@ -240,7 +240,13 @@ Check that line. A part that was stored wrapped across two lines reads as two sh
 
 All parts must have the same word count. The command refuses to emit a result when the parts cancel each other out, and exits with status `2` on any bad input. Prompts and errors go to stderr and the result to stdout, so redirecting stdout captures the phrase and nothing else. Ctrl-C or Ctrl-D at a prompt aborts without printing a result.
 
-> **This is not a threshold backup.** Every part is required forever — lose one and the wallet is gone. Provided the part you are missing is genuinely random and independent of the others, no subset of the remaining parts reveals anything about the result — which is exactly why you must never store a part alongside the combined phrase. That guarantee is only as good as that independence: parts derived from each other, or from the same weak source, do not give it.
+> **Seed XOR is used in two opposite ways, and they have opposite backup rules. Decide which one you are doing before you destroy anything.**
+>
+> **Generating a seed you don't have to trust one source for.** Combine the parts, back up the *combined* phrase, and destroy the parts. They are scratch work: once the result is backed up and verified, nothing depends on them ever again, and every copy left lying around is one more thing that has to stay secret. This is the scheme you want if the point was to avoid trusting a single hardware wallet's RNG. Verify the backup *before* you destroy the parts — restore from it, confirm the wallet fingerprint, and only then get rid of them, because afterwards that backup is the only copy in existence.
+>
+> **Splitting a seed you already have.** Keep the parts in separate places and never write the combined phrase down at all. Here every part is required forever — lose one and the wallet is gone. **This is not a threshold scheme**: there is no 2-of-3, it is all-of-n. Never store a part alongside the combined phrase, which would reduce the whole thing to plaintext.
+>
+> Both rest on the same assumption: provided one part is genuinely random and independent of the others, no subset of the rest reveals anything about the result. That guarantee is only as good as the independence — parts derived from each other, or from the same weak source, do not give it.
 
 ### Adding a tool
 
@@ -283,7 +289,7 @@ pre-commit install
 - The tools never write a seed phrase to disk and never make network calls — but your shell does keep a history file. Clear it (or prefix commands with a space) after working with real words.
 - Never commit anything containing a real seed phrase. Nothing scans for that automatically — treat every test vector you add as public. The phrases in [tests/vectors.py](tests/vectors.py) are published specification vectors and are already compromised.
 - `xor` and `tinyseed` never echo a phrase you type and never write it anywhere. The one exception is `tinyseed --reverse`, which echoes the rows of holes on purpose so you can proofread them — it is still a secret on your screen, so read a plate back somewhere nobody is looking. Either way, **Python cannot reliably wipe a phrase from process memory** — strings are immutable and may be copied by the interpreter or paged to swap. Treat the machine as contaminated afterwards: use an offline system and power it off when you are done.
-- A Seed XOR result needs *every* part to reconstruct. Back up all of them, and never store a part in the same place as the combined phrase — that reduces the whole scheme to plaintext.
+- Seed XOR has two uses with opposite backup rules — see [`xor`](#xor) before you throw anything away. If you are *splitting* a seed, every part is required forever, none of them may sit beside the combined phrase, and it is all-of-n rather than a threshold scheme. If you combined parts only to *generate* a seed that you then back up in full, the parts are scratch work and destroying them is the right move — but verify the backup first, because it becomes the only copy.
 
 ## Troubleshooting
 
