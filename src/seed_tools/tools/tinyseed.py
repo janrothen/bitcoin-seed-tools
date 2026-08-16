@@ -36,7 +36,7 @@ def register(subparsers: _SubParsersAction) -> None:
     parser.add_argument(
         "--stdin",
         action="store_true",
-        help="read the phrase from stdin (input is echoed)",
+        help="read the phrase from stdin",
     )
     parser.add_argument(
         "--reverse",
@@ -120,12 +120,17 @@ def _read_rows(use_stdin: bool) -> list[str]:
     while True:
         number = len(words) + 1
         line = read(_prompt(number, use_stdin))
-        if not line:
-            # End of input — no more rows are coming, however they were fed in.
-            return words
         if not line.strip():
             if use_stdin:
+                if not line:
+                    # End of the pipe — no more rows are coming.
+                    return words
+                # A blank line in a pipe is only the gap between two plates.
                 continue
+            # Typed, a blank line and Ctrl-D land here alike: `readline` returns
+            # "" at end of input, and both mean "that was the last row" — so
+            # both must face the seam check below, or a Ctrl-D at the seam
+            # would end the read that a stray Enter is stopped from ending.
             # One full plate is the single ambiguous place to stop: a 12-word
             # phrase ends here, and so does the first half of a 24-word one.
             # Reading two plates means a pause at the seam to pick up the

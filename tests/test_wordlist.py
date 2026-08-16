@@ -77,6 +77,12 @@ def test_unsorted_wordlist_rejected(words):
         Wordlist(entries)
 
 
+def test_missing_wordlist_file_is_bad_input_not_a_crash(tmp_path):
+    """A deleted or misplaced asset must report cleanly, not traceback."""
+    with pytest.raises(ValueError, match="Cannot read wordlist"):
+        Wordlist.from_file(tmp_path / "missing.txt")
+
+
 def test_shipped_wordlist_is_the_published_one():
     digest = hashlib.sha256(
         asset(config()["wordlist"]["file"]).read_bytes()

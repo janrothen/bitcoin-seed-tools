@@ -86,7 +86,11 @@ def read_pattern(text: str) -> int:
         elif mark in READ_OFF:
             bits.append("0")
         else:
-            raise ValueError(f"Not a punch mark at position {position}: {mark!r}")
+            # The position, never the mark: like the errors above and below,
+            # this one is logged, and what was really typed at a --reverse
+            # prompt could be anything — including a word of a seed phrase
+            # fed to the wrong tool.
+            raise ValueError(f"Not a punch mark at position {position}")
 
     number = int("".join(bits), 2)
     if number < MIN_NUMBER:

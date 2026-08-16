@@ -18,7 +18,7 @@ def register(subparsers: _SubParsersAction) -> None:
     parser.add_argument(
         "--stdin",
         action="store_true",
-        help="read parts from stdin, one phrase per line (input is echoed)",
+        help="read parts from stdin, one phrase per line",
     )
     parser.add_argument(
         "--entropy",

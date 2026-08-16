@@ -1,10 +1,9 @@
 import pytest
 
-from seed_tools.config import asset, config
-from seed_tools.wordlist import Wordlist
+from seed_tools.wordlist import Wordlist, wordlist
 
 
 @pytest.fixture(scope="session")
 def words() -> Wordlist:
-    """The real English wordlist from assets/ — it ships with the repo."""
-    return Wordlist.from_file(asset(config()["wordlist"]["file"]))
+    """The wordlist the tools themselves use — loaded once through the cache."""
+    return wordlist()

@@ -98,8 +98,11 @@ def test_a_rejected_row_is_not_repeated_back_in_the_error():
 
 
 def test_reading_rejects_a_mark_it_does_not_know_and_says_where():
-    with pytest.raises(ValueError, match="position 5: 'q'"):
+    """The position, never the mark: the error is logged, and what was really
+    typed could be a fragment of a seed phrase fed to the wrong tool."""
+    with pytest.raises(ValueError, match="position 5") as caught:
         tinyseed.read_pattern("○○○○q○○○○○○●")
+    assert "q" not in str(caught.value)
 
 
 def test_reading_rejects_a_row_with_no_holes():
