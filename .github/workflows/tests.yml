@@ -21,7 +21,13 @@ jobs:
           cache: pip
 
       - name: Install dependencies
-        run: pip install -e ".[dev]"
+        run: |
+          # Pinned and wheels-only: no version drifts in under us between runs,
+          # and no sdist setup script runs during install.
+          pip install --only-binary :all: -r requirements-dev.txt
+          # The project itself has no runtime dependencies, so nothing is
+          # resolved here — this only puts src/ on the path.
+          pip install -e . --no-deps
 
       - name: Lint
         run: |

@@ -41,6 +41,12 @@ pip install -e ".[dev]"
 pytest
 ```
 
+CI does not install the extras this way — it installs the pinned resolution in
+`requirements-dev.txt` with `--only-binary :all:`, then the project itself with
+`--no-deps`. Change a dev dependency in `pyproject.toml` and the pin file has to
+be regenerated in the same commit, or CI keeps running the old toolchain; the
+header in that file has the command.
+
 ## Run
 ```bash
 python -m seed_tools lookup abandon
