@@ -11,7 +11,10 @@
 
 A small collection of command-line tools for working with BIP-39 seed phrases. Everything runs locally on your own machine — there is no deployment, no network access, and no service to configure. The BIP-39 English wordlist ships with the repository in [assets/](assets), so the tools work fully offline.
 
-> **Security:** these tools are meant for throwaway or test seed phrases. Never type a seed phrase that holds funds into a machine that is online. See [Security](#security).
+> [!CAUTION]
+> These tools are meant for throwaway or test seed phrases. Never type a seed phrase that holds funds into a machine that is online.
+>
+> Anyone who sees your seed phrase can take everything it controls. Never copy, paste, screenshot or forward anything these tools print, and never share a phrase with anyone offering to help you — on X, Discord, Telegram, GitHub, by email, or in a support chat. Anyone asking for your seed phrase is a scammer, without exception. See [Security](#security).
 
 ## Disclaimer
 
@@ -335,6 +338,7 @@ pre-commit install
 ## Security
 
 - Never enter a seed phrase that controls real funds on an internet-connected machine. Use an offline machine, or use test phrases only.
+- Never share a seed phrase, and never share the output of these tools. A phrase is not a password you can rotate — whoever holds it holds the funds, immediately and irreversibly. Nobody legitimate ever needs it: not a wallet vendor, not an exchange, not a support agent, not a bug report, and not whoever answers you on X, Discord, Telegram or Reddit. Anyone asking for it is stealing from you.
 - The tools never write a seed phrase to disk and never make network calls — but your shell does keep a history file. Clear it (or prefix commands with a space) after working with real words.
 - Never commit anything containing a real seed phrase. Nothing scans for that automatically — treat every test vector you add as public. The phrases in [tests/vectors.py](tests/vectors.py) are published specification vectors and are already compromised.
 - `xor`, `tinyseed` and `checksum` never echo a phrase you type and never write it anywhere. The one exception is `tinyseed --reverse`, which echoes the rows of holes on purpose so you can proofread them — it is still a secret on your screen, so read a plate back somewhere nobody is looking. Either way, **Python cannot reliably wipe a phrase from process memory** — strings are immutable and may be copied by the interpreter or paged to swap. Treat the machine as contaminated afterwards: use an offline system and power it off when you are done.
