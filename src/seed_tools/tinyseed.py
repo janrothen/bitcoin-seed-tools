@@ -14,8 +14,9 @@ CIRCLE_ON = "●"  # U+25CF BLACK CIRCLE — punch this position
 # 2048 needs 12 bits, so every pattern is 12 positions wide.
 PLATE_BITS = 12
 
-# One plate holds 12 rows; a 24-word phrase spans two plates.
-PLATE_ROWS = 12
+# A plate is punched on both sides, 12 rows to a side: a 12-word phrase fills
+# the front, a 24-word one carries on over the back.
+SIDE_ROWS = 12
 
 # Which pair of glyphs a pattern is drawn with: (zero, one).
 STYLES = {

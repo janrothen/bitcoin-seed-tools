@@ -21,11 +21,11 @@ STDIN_READS = "the whole phrase from stdin"
 # Reading back, a newline separates one row of the plate from the next.
 REVERSE_STDIN_READS = "one plate row per line"
 
-# Shown when a typed list stops at exactly one full plate — see `_read_rows`.
+# Shown when a typed list stops at exactly one full side — see `_read_rows`.
 SEAM_NOTICE = (
-    f"— {tinyseed.PLATE_ROWS} rows read, which is one full plate. A 24-word "
-    "phrase spans two: carry on with the next plate, or press Enter again to "
-    "finish here."
+    f"— {tinyseed.SIDE_ROWS} rows read, which is one full side of the plate. A "
+    "24-word phrase fills both: turn the plate over and carry on, or press "
+    "Enter again to finish here."
 )
 
 
@@ -107,12 +107,12 @@ def _read_rows(use_stdin: bool) -> list[str]:
 
     What ends the list depends on where the rows come from. Typed at a prompt
     there is nothing but a blank line to say "that was the last row". Piped, the
-    file's own end says it, so a blank line there is only the gap between two
-    plates and is skipped: a 24-word phrase written out as two blocks of twelve
-    must not read back as its first twelve, which is a valid phrase in its own
-    right and passes the checksum once in sixteen — the tool would then report
-    success on a phrase that is not what the plates say, which is precisely the
-    mistake reading a plate back exists to catch.
+    file's own end says it, so a blank line there is only the gap between the
+    front and the back of the plate and is skipped: a 24-word phrase written out
+    as two blocks of twelve must not read back as its first twelve, which is a
+    valid phrase in its own right and passes the checksum once in sixteen — the
+    tool would then report success on a phrase that is not what the plate says,
+    which is precisely the mistake reading a plate back exists to catch.
     """
     read = phrase_input.row_reader()
     words: list[str] = []
@@ -125,26 +125,26 @@ def _read_rows(use_stdin: bool) -> list[str]:
                 if not line:
                     # End of the pipe — no more rows are coming.
                     break
-                # A blank line in a pipe is only the gap between two plates.
+                # A blank line in a pipe is only the gap between the two sides.
                 continue
             # Typed, a blank line and Ctrl-D land here alike: `readline` returns
             # "" at end of input, and both mean "that was the last row" — so
             # both must face the seam check below, or a Ctrl-D at the seam
             # would end the read that a stray Enter is stopped from ending.
-            # One full plate is the single ambiguous place to stop: a 12-word
+            # One full side is the single ambiguous place to stop: a 12-word
             # phrase ends here, and so does the first half of a 24-word one.
-            # Reading two plates means a pause at the seam to pick up the
-            # second, and an Enter pressed in that pause would otherwise end
+            # Reading both sides means a pause at the seam to turn the plate
+            # over, and an Enter pressed in that pause would otherwise end
             # the list — leaving twelve words that pass the checksum once in
             # sixteen and get printed as the whole phrase. That is the misread
             # this subcommand exists to catch, so say so once and keep the
-            # prompt open; a second blank line means it really was one plate.
-            if len(words) == tinyseed.PLATE_ROWS and not seam_seen:
+            # prompt open; a second blank line means it really was one side.
+            if len(words) == tinyseed.SIDE_ROWS and not seam_seen:
                 seam_seen = True
                 print(SEAM_NOTICE, file=sys.stderr)
                 continue
             break
-        # Decoded here rather than once the whole plate is in, so a miscounted
+        # Decoded here rather than once every row is in, so a miscounted
         # row is reported while that row is still the one under the reader's eye.
         try:
             words.append(tinyseed.read_word(line))
@@ -154,8 +154,8 @@ def _read_rows(use_stdin: bool) -> list[str]:
 
 
 def _prompt(number: int, use_stdin: bool) -> str:
-    # A 24-word phrase spans two plates, so past the first the list may end.
-    # Piped, a blank line is not what ends it, so the hint would be a lie.
-    if use_stdin or number <= tinyseed.PLATE_ROWS:
+    # A 24-word phrase carries on over the back, so past the front side the
+    # list may end. Piped, a blank line is not what ends it — the hint would lie.
+    if use_stdin or number <= tinyseed.SIDE_ROWS:
         return f"Row {number}: "
     return f"Row {number} (blank to finish): "
