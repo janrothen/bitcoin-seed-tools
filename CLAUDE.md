@@ -15,9 +15,11 @@ src/seed_tools/
     cli.py               # argparse setup, subcommand dispatch, error handling
     config.py            # tomllib config loader
     wordlist.py          # Wordlist: word ↔ index ↔ 11-bit binary
+    mnemonic.py          # BIP-39 phrases: entropy ↔ words, checksum, XOR
     tools/
         __init__.py      # TOOLS registry — add new tool modules here
         lookup.py        # `lookup` subcommand
+        xor.py           # `xor` subcommand
 tests/
 assets/
     bip-0039-english.txt      # BIP-39 English wordlist (2048 words)
@@ -56,6 +58,8 @@ Register it in `TOOLS` in `tools/__init__.py`. `cli.py` stays untouched.
   hardcoded path. `BITCOIN_SEED_TOOLS_HOME` overrides the project root for
   non-editable installs.
 - `wordlist.wordlist()` is cached — load it through that, not `Wordlist.from_file`.
+- BIP-39 encoding lives in `mnemonic.py` and stays I/O-free: it returns values or
+  raises `ValueError`, never prints or prompts. Tools own the interaction.
 
 ## Security
 - Never write a seed phrase to disk, log it, or send it anywhere. The tools make
