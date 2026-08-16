@@ -37,8 +37,10 @@ src/seed_tools/
     cli.py               # argument parsing, subcommand dispatch
     config.py            # tomllib config loader
     wordlist.py          # BIP-39 wordlist: word ↔ index ↔ 11-bit binary
+    mnemonic.py          # BIP-39 phrases: entropy ↔ words, checksum, XOR
     tools/
         lookup.py        # `lookup` subcommand
+        xor.py           # `xor` subcommand
 tests/
 assets/
     bip-0039-english.txt      # BIP-39 English wordlist (2048 words)
@@ -83,6 +85,47 @@ seed-tools lookup abandon 42 zeb
 
 Unknown terms print `no match` and the command exits with status `1`.
 
+### `xor`
+
+Combine two or more seed phrases into one by XOR-ing their entropy and computing a fresh checksum. Use it when you don't want to trust a single hardware wallet's random number generator: XOR the wallet's phrase with one you generated independently (dice, coin flips, a second device). As long as **any one** part is genuinely random and independent of the others, the combined seed is uniformly random — a biased or backdoored RNG in one device cannot skew the result.
+
+This implements [Seed XOR](https://github.com/Coldcard/firmware/blob/master/docs/seed-xor.md), the open standard used by Coldcard, so the result can be reconstructed on any wallet that supports it — not just here.
+
+```bash
+seed-tools xor
+```
+
+The tool prompts for each part without echoing it, and a blank line ends the list:
+
+```
+Part 1:
+Part 2:
+Part 3 (blank to finish):
+ 1  silent
+ 2  toe
+ 3  meat
+ …
+24  indoor
+
+silent toe meat possible chair blossom wait occur this worth option bag nurse find fish scene bench asthma bike wage world quit primary indoor
+```
+
+The numbered list is for transcribing onto a backup one word at a time; the final line repeats the same phrase in full for entering it into a wallet in one go.
+
+Every part's own checksum is verified the moment it is entered, so a mistyped or transposed word is caught before it can silently produce a different — and unrecoverable — wallet. A bad part stops the command right there, naming the part that failed, rather than letting you type the remaining ones first:
+
+```
+Part 1:
+Part 2:
+ERROR seed_tools.cli: Part 2: Invalid checksum — check the words and their order
+```
+
+Add `--entropy` to also print the combined entropy as hex, which is useful for cross-checking against another implementation.
+
+All parts must have the same word count. The command refuses to emit a result when the parts cancel each other out, and exits with status `2` on any bad input. Prompts and errors go to stderr and the result to stdout, so redirecting stdout captures the phrase and nothing else. Ctrl-C or Ctrl-D at a prompt aborts without printing a result.
+
+> **This is not a threshold backup.** Every part is required forever — lose one and the wallet is gone. Any subset of parts reveals nothing about the result, which is exactly why you must never store a part alongside the combined phrase.
+
 ### Adding a tool
 
 Each tool is a module in [src/seed_tools/tools/](src/seed_tools/tools) exposing `register(subparsers)` and `run(args) -> int`. Add the module to `TOOLS` in [tools/__init__.py](src/seed_tools/tools/__init__.py) and it becomes a subcommand — no changes to `cli.py` needed.
@@ -118,7 +161,9 @@ pre-commit install
 
 - Never enter a seed phrase that controls real funds on an internet-connected machine. Use an offline machine, or use test phrases only.
 - The tools never write a seed phrase to disk and never make network calls — but your shell does keep a history file. Clear it (or prefix commands with a space) after working with real words.
-- Never commit anything containing a real seed phrase. Nothing scans for that automatically — treat every test vector you add as public.
+- Never commit anything containing a real seed phrase. Nothing scans for that automatically — treat every test vector you add as public. The phrases in [tests/vectors.py](tests/vectors.py) are published specification vectors and are already compromised.
+- `xor` never echoes what you type and never writes it anywhere, but **Python cannot reliably wipe a phrase from process memory** — strings are immutable and may be copied by the interpreter or paged to swap. Treat the machine as contaminated afterwards: use an offline system and power it off when you are done.
+- A Seed XOR result needs *every* part to reconstruct. Back up all of them, and never store a part in the same place as the combined phrase — that reduces the whole scheme to plaintext.
 
 ## Troubleshooting
 
@@ -129,6 +174,13 @@ pre-commit install
 | `ValueError: Wordlist must contain 2048 words` | The wordlist file was edited or truncated — restore it from git |
 | `Not a BIP-39 word` | The word is not in the English wordlist; BIP-39 words are lowercase and unaccented |
 | `no match` for a valid-looking number | Indices are 0-based and stop at 2047 |
+| `Part N: Invalid checksum` | A word in part `N` is wrong or out of order — the last word encodes a checksum over all the others, so re-read that part carefully |
+| `Aborted — no result was produced` | Ctrl-C or Ctrl-D was pressed at a prompt; nothing was combined or printed |
+| `Seed phrase must be 12, 15, 18, 21 or 24 words` | A word was dropped or duplicated while typing the part |
+| `All parts must have the same word count` | Mixing a 12-word and a 24-word part — `xor` needs them the same length |
+| `Need at least 2 parts to XOR` | The list was ended with a blank line too early; enter at least two phrases |
+| `Parts cancel out` | Two parts are identical, or one equals the XOR of the others — the extra parts add no entropy, so use independent ones |
+| `stdin is not a terminal` | `xor` was piped or run from a script — pass `--stdin` to accept one phrase per line (it will be echoed) |
 | `command not found: seed-tools` | The virtualenv is not activated, or the package was installed elsewhere — run `source .venv/bin/activate` |
 | `ModuleNotFoundError: No module named 'seed_tools'` | Running `python -m seed_tools` outside the venv, or the package was never installed — run `pip install -e .` |
 
