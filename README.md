@@ -174,6 +174,8 @@ Unlike every other prompt in this project, **this one echoes what you type** —
 seed-tools tinyseed --reverse --stdin < plate.txt
 ```
 
+Piped like this the file's own end is what stops the read, so a blank line in it is only the gap between two plates and is skipped — write 24 rows as twelve, a gap, and twelve more if that is how you copied them down. (Typed at the prompt there is no end-of-file to wait for, so there a blank line still ends the list.)
+
 > Verify before the wallet holds anything. Read the plate you just punched, not the phrase you meant to punch — the point is to catch the difference.
 
 ### `xor`
@@ -281,6 +283,7 @@ pre-commit install
 | `Row N: Expected 12 positions, got 11` | A hole was missed or double-counted while reading row `N` — every row is exactly 12 positions, so count them again, in groups of three if it helps |
 | `Row N: Not a punch mark at position P` | Something that is not a hole or a blank was typed at position `P` of row `N` — use `○`/`●`, `0`/`1`, or `.`/`#` |
 | `Row N: Row has no holes` | Row `N` was entered as twelve blanks, which is no word at all — either the row was skipped, or the plate is misaligned by one |
+| `Row N: Pattern is past the end of the wordlist` | Position 1 of row `N` was read as punched, and only `zoo` has that hole — most likely the row was shifted by one, so check where it starts |
 | `Invalid checksum` from `--reverse` | The plate does not say what you meant it to: one row is misread, or a hole really is in the wrong place. Re-read each row against [assets/bip-0039-english-tinyseed.txt](assets/bip-0039-english-tinyseed.txt) before trusting the plate |
 | `command not found: seed-tools` | The virtualenv is not activated, or the package was installed elsewhere — run `source .venv/bin/activate` |
 | `ModuleNotFoundError: No module named 'seed_tools'` | Running `python -m seed_tools` outside the venv, or the package was never installed — run `pip install -e .` |

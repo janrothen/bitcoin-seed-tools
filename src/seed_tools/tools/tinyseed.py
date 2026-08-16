@@ -80,7 +80,7 @@ def _read_plate(args: Namespace) -> int:
         )
     phrase_input.require_interactive_or_stdin(args.stdin, REVERSE_STDIN_READS)
     with phrase_input.aborting():
-        words = _read_rows()
+        words = _read_rows(args.stdin)
 
     # The checksum is what makes this a check and not just a translation: a
     # misread row, or a hole in the wrong place, almost always breaks it.
@@ -94,14 +94,29 @@ def _read_plate(args: Namespace) -> int:
     return 0
 
 
-def _read_rows() -> list[str]:
-    """Read rows until a blank line, decoding each one as it is entered."""
+def _read_rows(use_stdin: bool) -> list[str]:
+    """Read rows until the input ends, decoding each one as it is entered.
+
+    What ends the list depends on where the rows come from. Typed at a prompt
+    there is nothing but a blank line to say "that was the last row". Piped, the
+    file's own end says it, so a blank line there is only the gap between two
+    plates and is skipped: a 24-word phrase written out as two blocks of twelve
+    must not read back as its first twelve, which is a valid phrase in its own
+    right and passes the checksum once in sixteen — the tool would then report
+    success on a phrase that is not what the plates say, which is precisely the
+    mistake reading a plate back exists to catch.
+    """
     read = phrase_input.row_reader()
     words: list[str] = []
     while True:
         number = len(words) + 1
-        line = read(_prompt(number))
+        line = read(_prompt(number, use_stdin))
+        if not line:
+            # End of input — no more rows are coming, however they were fed in.
+            return words
         if not line.strip():
+            if use_stdin:
+                continue
             return words
         # Decoded here rather than once the whole plate is in, so a miscounted
         # row is reported while that row is still the one under the reader's eye.
@@ -111,8 +126,9 @@ def _read_rows() -> list[str]:
             raise ValueError(f"Row {number}: {error}") from None
 
 
-def _prompt(number: int) -> str:
+def _prompt(number: int, use_stdin: bool) -> str:
     # A 24-word phrase spans two plates, so past the first the list may end.
-    if number <= tinyseed.PLATE_ROWS:
+    # Piped, a blank line is not what ends it, so the hint would be a lie.
+    if use_stdin or number <= tinyseed.PLATE_ROWS:
         return f"Row {number}: "
     return f"Row {number} (blank to finish): "

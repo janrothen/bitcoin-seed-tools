@@ -368,6 +368,41 @@ def test_tinyseed_reverse_reads_two_plates_as_one_phrase(capsys, monkeypatch):
     assert capsys.readouterr().out.splitlines()[-1] == XOR_24_RESULT
 
 
+def test_tinyseed_reverse_reads_two_plates_written_as_two_blocks(capsys, monkeypatch):
+    """Piped, a blank line between the plates is a gap in the paper, not the end.
+
+    The file's own end says where the rows stop, so the natural way to write two
+    plates down — twelve rows, a gap, twelve more — has to read back whole.
+    """
+    rows = _plate(XOR_24_RESULT)
+    _feed(monkeypatch, *rows[:12], "", *rows[12:])
+    assert main(["tinyseed", "--reverse", "--stdin"]) == 0
+    assert capsys.readouterr().out.splitlines()[-1] == XOR_24_RESULT
+
+
+def test_tinyseed_reverse_does_not_stop_at_a_gap_that_checksums(capsys, monkeypatch):
+    """The reason the gap cannot end the list: stopping early can look like success.
+
+    Roughly one 24-word phrase in sixteen opens with twelve words that are a
+    valid phrase in their own right. Stopping at the gap would then print those
+    twelve and exit 0 — a clean read of a backup nobody has.
+    """
+    phrase = _phrase_of_24_starting_with(XOR_12_PARTS[0])
+    rows = _plate(phrase)
+    _feed(monkeypatch, *rows[:12], "", *rows[12:])
+    assert main(["tinyseed", "--reverse", "--stdin"]) == 0
+    assert capsys.readouterr().out.splitlines()[-1] == phrase
+
+
+def test_tinyseed_reverse_ends_a_typed_list_at_a_blank_line(capsys, monkeypatch):
+    """Typed, a blank line is still the only way to say "that was the last row"."""
+    rows = _plate(XOR_12_PARTS[0])
+    # Anything after the blank line is not read: at a prompt, blank means done.
+    _rows(monkeypatch, *rows, "\n", *_plate(XOR_12_PARTS[1]))
+    assert main(["tinyseed", "--reverse"]) == 0
+    assert capsys.readouterr().out.splitlines()[-1] == XOR_12_PARTS[0]
+
+
 @pytest.mark.parametrize("style", sorted(tinyseed.STYLES))
 def test_tinyseed_reverse_reads_any_notation(capsys, monkeypatch, style):
     _feed(monkeypatch, *_plate(XOR_12_PARTS[0], style))

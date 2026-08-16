@@ -110,8 +110,22 @@ def test_reading_rejects_a_row_with_no_holes():
 
 def test_reading_rejects_a_pattern_past_the_end_of_the_wordlist():
     """12 bits reach 4095; a fifth of what a plate can hold names no word."""
-    with pytest.raises(ValueError, match="out of range"):
+    with pytest.raises(ValueError, match="past the end of the wordlist"):
         tinyseed.read_pattern("●●●●●●●●●●●●")
+
+
+def test_an_out_of_range_row_is_not_spelled_out_by_its_number():
+    """The number *is* the row: printing it writes the transcription to the log.
+
+    A real row with one hole too many at the front lands here, and it is still
+    one bit off the word it was meant to be.
+    """
+    # `silent` is 1604; a stray hole at position 1 makes it 3652.
+    with pytest.raises(ValueError) as raised:
+        tinyseed.read_pattern("●●●○○●○○○●○○")
+    message = str(raised.value)
+    assert "3652" not in message
+    assert format(3652, "012b") not in message
 
 
 def test_every_glyph_that_can_be_drawn_can_also_be_read():

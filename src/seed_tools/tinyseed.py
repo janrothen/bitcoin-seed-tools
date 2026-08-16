@@ -96,8 +96,13 @@ def read_pattern(text: str) -> int:
     if number > MAX_NUMBER:
         # 12 bits reach 4095, but the wordlist stops at 2048, so a fifth of the
         # patterns a plate can physically hold name no word at all.
+        #
+        # Says which position gives it away, never the number: the number *is*
+        # the row, and a row one hole off a real one still spells out that word.
+        # Same reasoning as the length check above — this is logged too.
         raise ValueError(
-            f"Plate number out of range ({MIN_NUMBER}-{MAX_NUMBER}): {number}"
+            f"Pattern is past the end of the wordlist ({MIN_NUMBER}-{MAX_NUMBER})"
+            " — position 1 is punched, which only zoo (2048) does"
         )
     return number
 
