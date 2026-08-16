@@ -92,7 +92,7 @@ Unknown terms print `no match` and the command exits with status `1`.
 
 ### `tinyseed`
 
-Turn a seed phrase into the punch pattern for a [TinySeed](https://tinyseed.io) plate — a titanium card that stores a backup as drilled holes instead of letters, so it survives fire and water. Reading all 24 rows off the printed card by hand is slow and easy to get wrong, and a hole cannot be un-punched.
+Turn a seed phrase into the punch pattern for a [TinySeed](https://tinyseed.io) plate — a titanium card that stores a backup as drilled holes instead of letters, so it survives fire and water. Reading all 24 rows off the printed card by hand is slow and easy to get wrong, and a hole cannot be un-punched. It goes both ways: `--reverse` [reads a punched plate back](#reading-a-plate-back) so you can check what you actually engraved.
 
 TinySeed numbers the wordlist **1–2048** and punches that number in **12 bits**, most significant bit first. That is deliberately *not* the 11-bit index `lookup` prints: it is that index **plus one**, and only `zoo` (2048) sets the leading bit.
 
@@ -131,7 +131,52 @@ Note this differs from `xor --stdin`, where a newline separates one part from th
 
 The full translation table ships as [assets/bip-0039-english-tinyseed.txt](assets/bip-0039-english-tinyseed.txt) (number, word, binary, circles), alongside the official printable card in [assets/bip-0039-tinyseed_io.pdf](assets/bip-0039-tinyseed_io.pdf). A test regenerates the table from the wordlist and compares it against the shipped file, so the two cannot drift apart.
 
-> **Read the plate back before you trust it.** Punch it, then decode the holes independently — with the printed card, or by comparing against this table — and confirm you recover the same phrase. Verify before the wallet holds anything.
+#### Reading a plate back
+
+**Punching the plate is only half the job.** A hole in the wrong row is invisible until the day you need the backup, and by then the plate is all you have. So read it back: look at the finished plate, type in what you actually see, and let the tool tell you what it says.
+
+```bash
+seed-tools tinyseed --reverse
+```
+
+It asks for one row at a time — `○` where the metal is untouched, `●` where you punched it:
+
+```
+Row 1: ○●●○○●○○○●○○
+Row 2: ○●●●○○○●●●○●
+…
+Row 12: ○○●●●○○●●○○●
+Row 13 (blank to finish):
+ 1  silent
+ 2  toe
+ …
+12  indoor
+
+silent toe meat …
+```
+
+A blank line ends the list. One plate holds 12 rows, so a 24-word phrase runs across two of them — keep going past row 12 and finish with a blank line there instead.
+
+Since `●` and `○` are not on a keyboard, a row may be written any of these ways, and they may be mixed within a row:
+
+| Position | Accepted marks |
+| --- | --- |
+| Untouched | `○` `0` `.` `o` `O` |
+| Punched | `●` `1` `#` `x` `X` |
+
+So `.##..#...#..` and `011001000100` and `○●●○○●○○○●○○` are the same row. Spaces are ignored, so you may group the holes to keep your place: `○●● ○○● ○○○ ●○○`. Anything else is refused — a row must be exactly 12 positions, never nearly 12.
+
+**The check that matters is the checksum.** The words are only printed if the whole plate decodes to a valid BIP-39 phrase, so a misread row or a mispunched hole almost always fails outright, and nothing is printed. That leaves the rare case where a wrong plate still checksums: compare the printed phrase against your backup, which is what the last line is for.
+
+Unlike every other prompt in this project, **this one echoes what you type** — a transcription you cannot see is not one you can proofread, and the decoded words are printed anyway. `--style` is not accepted here: the marks are recognised however you write them.
+
+```bash
+seed-tools tinyseed --reverse --stdin < plate.txt
+```
+
+Piped like this the file's own end is what stops the read, so a blank line in it is only the gap between two plates and is skipped — write 24 rows as twelve, a gap, and twelve more if that is how you copied them down. (Typed at the prompt there is no end-of-file to wait for, so there a blank line still ends the list.)
+
+> Verify before the wallet holds anything. Read the plate you just punched, not the phrase you meant to punch — the point is to catch the difference.
 
 ### `xor`
 
@@ -214,7 +259,7 @@ pre-commit install
 - Never enter a seed phrase that controls real funds on an internet-connected machine. Use an offline machine, or use test phrases only.
 - The tools never write a seed phrase to disk and never make network calls — but your shell does keep a history file. Clear it (or prefix commands with a space) after working with real words.
 - Never commit anything containing a real seed phrase. Nothing scans for that automatically — treat every test vector you add as public. The phrases in [tests/vectors.py](tests/vectors.py) are published specification vectors and are already compromised.
-- `xor` and `tinyseed` never echo what you type and never write it anywhere, but **Python cannot reliably wipe a phrase from process memory** — strings are immutable and may be copied by the interpreter or paged to swap. Treat the machine as contaminated afterwards: use an offline system and power it off when you are done.
+- `xor` and `tinyseed` never echo a phrase you type and never write it anywhere. The one exception is `tinyseed --reverse`, which echoes the rows of holes on purpose so you can proofread them — it is still a secret on your screen, so read a plate back somewhere nobody is looking. Either way, **Python cannot reliably wipe a phrase from process memory** — strings are immutable and may be copied by the interpreter or paged to swap. Treat the machine as contaminated afterwards: use an offline system and power it off when you are done.
 - A Seed XOR result needs *every* part to reconstruct. Back up all of them, and never store a part in the same place as the combined phrase — that reduces the whole scheme to plaintext.
 
 ## Troubleshooting
@@ -232,9 +277,14 @@ pre-commit install
 | `All parts must have the same word count` | Mixing a 12-word and a 24-word part — `xor` needs them the same length |
 | `Need at least 2 parts to XOR` | The list was ended with a blank line too early; enter at least two phrases |
 | `Parts cancel out` | Two parts are identical, or one equals the XOR of the others — the extra parts add no entropy, so use independent ones |
-| `stdin is not a terminal` | `xor` or `tinyseed` was piped or run from a script — pass `--stdin` (it will be echoed). `xor` reads one phrase per line; `tinyseed` reads the whole of stdin as one phrase |
+| `stdin is not a terminal` | `xor` or `tinyseed` was piped or run from a script — pass `--stdin` (it will be echoed). `xor` reads one phrase per line; `tinyseed` reads the whole of stdin as one phrase, and `tinyseed --reverse` one plate row per line |
 | `tinyseed` circles look doubled or misaligned | The terminal renders `●`/`○` at double width (they are East Asian *Ambiguous*) — use `--style binary` |
 | A `tinyseed` number is one higher than `lookup` says | Correct: TinySeed numbers the wordlist 1–2048, `lookup` uses the BIP-39 index 0–2047 |
+| `Row N: Expected 12 positions, got 11` | A hole was missed or double-counted while reading row `N` — every row is exactly 12 positions, so count them again, in groups of three if it helps |
+| `Row N: Not a punch mark at position P` | Something that is not a hole or a blank was typed at position `P` of row `N` — use `○`/`●`, `0`/`1`, or `.`/`#` |
+| `Row N: Row has no holes` | Row `N` was entered as twelve blanks, which is no word at all — either the row was skipped, or the plate is misaligned by one |
+| `Row N: Pattern is past the end of the wordlist` | Position 1 of row `N` was read as punched, and only `zoo` has that hole — most likely the row was shifted by one, so check where it starts |
+| `Invalid checksum` from `--reverse` | The plate does not say what you meant it to: one row is misread, or a hole really is in the wrong place. Re-read each row against [assets/bip-0039-english-tinyseed.txt](assets/bip-0039-english-tinyseed.txt) before trusting the plate |
 | `command not found: seed-tools` | The virtualenv is not activated, or the package was installed elsewhere — run `source .venv/bin/activate` |
 | `ModuleNotFoundError: No module named 'seed_tools'` | Running `python -m seed_tools` outside the venv, or the package was never installed — run `pip install -e .` |
 

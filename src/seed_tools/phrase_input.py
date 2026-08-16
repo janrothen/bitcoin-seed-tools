@@ -2,6 +2,7 @@
 
 Hidden by default: a phrase typed at a prompt is never echoed, never written
 anywhere, and never taken from argv, where the shell would keep it in history.
+The one exception is `row_reader` — see the reasoning there.
 """
 
 import getpass
@@ -47,6 +48,20 @@ def phrase_reader(use_stdin: bool) -> Callable[[str], str]:
     was stored wrapped, and half a plate can still pass the checksum.
     """
     return read_all_echoed if use_stdin else read_line_hidden
+
+
+def row_reader() -> Callable[[str], str]:
+    """How to read one row of a plate being read back — echoed, typed or piped.
+
+    The exception to hiding input. What is entered here is a pattern of holes
+    being checked against the plate in the reader's hand, and a transcription
+    that cannot be seen cannot be proofread — which is the whole point of
+    reading a plate back. The words it decodes to are printed anyway.
+
+    Takes no `use_stdin`: at end of input `readline` returns an empty string,
+    which ends the list exactly as a blank line typed at a prompt does.
+    """
+    return read_line_echoed
 
 
 def require_interactive_or_stdin(use_stdin: bool, stdin_reads: str) -> None:
