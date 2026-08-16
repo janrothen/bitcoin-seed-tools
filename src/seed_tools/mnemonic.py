@@ -94,9 +94,13 @@ def final_words(
             f"Seed phrase must be {_options(PARTIAL_WORD_COUNTS)} words — every "
             f"word but the last — got {len(mnemonic)}"
         )
+    word_count = len(mnemonic) + 1
     prefix = "".join(_binary(words, mnemonic))
-    split = entropy_bits(len(mnemonic) + 1)
-    missing = split - len(prefix)
+    split = entropy_bits(word_count)
+    # The same count the tools quote as coin flips, from the same expression —
+    # a list of 2**missing candidates and the advice on how to draw one of them
+    # cannot end up describing different numbers of bits.
+    missing = final_word_entropy_bits(word_count)
     # Each candidate is built by encoding a whole phrase and keeping its last
     # word, rather than assembling that word from the tail bits and a checksum
     # here. The completions then come off exactly the path that encodes every
