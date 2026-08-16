@@ -44,6 +44,20 @@ def test_lookup_by_prefix_lists_all_matches(capsys):
     assert capsys.readouterr().out.count("\n") == 1
 
 
+def test_lookup_accepts_a_word_typed_uppercase(capsys):
+    """The other subcommands lowercase their input; lookup must agree with them."""
+    assert main(["lookup", "ABANDON"]) == 0
+    assert capsys.readouterr().out == "   0  00000000000  abandon\n"
+
+
+def test_lookup_succeeds_when_any_term_matches(capsys):
+    """Like grep: finding anything is success, even if another term missed."""
+    assert main(["lookup", "abandon", "bitcoin"]) == 0
+    out = capsys.readouterr().out
+    assert "abandon" in out
+    assert "bitcoin: no match" in out
+
+
 def test_lookup_of_a_word_that_prefixes_others_lists_them_all(capsys):
     """`car` is a word, but a smudged backup needs carbon..cart offered too."""
     assert main(["lookup", "car"]) == 0
@@ -214,6 +228,14 @@ def test_xor_refuses_a_non_terminal_without_the_stdin_flag(monkeypatch, caplog):
     assert "one phrase per line" in caplog.text
 
 
+def test_xor_refuses_the_stdin_flag_at_a_terminal(monkeypatch, caplog):
+    """Typed under --stdin, a phrase would be echoed into scrollback."""
+    monkeypatch.setattr("seed_tools.phrase_input.stdin_is_tty", lambda: True)
+    assert main(["xor", "--stdin"]) == 2
+    assert "stdin is a terminal" in caplog.text
+    assert "drop --stdin" in caplog.text
+
+
 def test_xor_names_the_part_that_failed(monkeypatch, caplog):
     swapped = " ".join([*XOR_24_PARTS[1].split()[:-1], "zoo"])
     _feed(monkeypatch, XOR_24_PARTS[0], swapped, XOR_24_PARTS[2])
@@ -371,6 +393,14 @@ def test_tinyseed_refuses_a_non_terminal_without_the_stdin_flag(monkeypatch, cap
     # tinyseed's --stdin takes one phrase, so it must not promise xor's format.
     assert "the whole phrase from stdin" in caplog.text
     assert "per line" not in caplog.text
+
+
+def test_tinyseed_refuses_the_stdin_flag_at_a_terminal(monkeypatch, caplog):
+    """Typed under --stdin, a phrase would be echoed into scrollback."""
+    monkeypatch.setattr("seed_tools.phrase_input.stdin_is_tty", lambda: True)
+    assert main(["tinyseed", "--stdin"]) == 2
+    assert "stdin is a terminal" in caplog.text
+    assert "drop --stdin" in caplog.text
 
 
 def test_tinyseed_prompts_without_echo_on_a_terminal(capsys, monkeypatch):

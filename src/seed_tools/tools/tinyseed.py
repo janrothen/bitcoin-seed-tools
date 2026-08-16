@@ -36,7 +36,7 @@ def register(subparsers: _SubParsersAction) -> None:
     parser.add_argument(
         "--stdin",
         action="store_true",
-        help="read the phrase from stdin (input is echoed)",
+        help="read the phrase from stdin",
     )
     parser.add_argument(
         "--reverse",

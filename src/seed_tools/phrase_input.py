@@ -65,14 +65,24 @@ def row_reader() -> Callable[[str], str]:
 
 
 def require_interactive_or_stdin(use_stdin: bool, stdin_reads: str) -> None:
-    """Refuse to prompt when nobody is there to type, unless --stdin was passed.
+    """Refuse to prompt when nobody is there to type, and to read a typed pipe.
 
     `stdin_reads` completes "pass --stdin to read ..." — what the flag means
     differs per tool, so each one describes its own input.
+
+    Both directions are checked. Without --stdin, a pipe has nobody to prompt.
+    With it, a terminal would echo whatever is typed straight into scrollback
+    and any session recording — the exposure the hidden prompt exists to
+    prevent, reachable by one slipped flag.
     """
     if not use_stdin and not stdin_is_tty():
         raise ValueError(
             "stdin is not a terminal — rerun interactively, or pass --stdin to read "
+            f"{stdin_reads}"
+        )
+    if use_stdin and stdin_is_tty():
+        raise ValueError(
+            "stdin is a terminal — drop --stdin to be prompted, or pipe in "
             f"{stdin_reads}"
         )
 

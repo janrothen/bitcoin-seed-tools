@@ -88,7 +88,7 @@ seed-tools lookup abandon 42 zeb
 2044  11111111100  zebra
 ```
 
-Unknown terms print `no match` and the command exits with status `1`.
+Unknown terms print `no match`; like `grep`, the command exits with status `1` only when no term matched at all. Terms are matched lowercase, the way BIP-39 words are written.
 
 ### `tinyseed`
 
@@ -119,7 +119,7 @@ Add `--style binary` to print `1`/`0` instead. Use it if your terminal renders t
 
 The phrase is verified before anything is printed: the word count and the BIP-39 checksum must both be right, so a mistyped or transposed word is caught before it reaches the plate. Bad input exits with status `2` and prints nothing.
 
-Like `xor`, the phrase is never taken as a command-line argument — that would leave it in your shell history. Pass `--stdin` to pipe it in instead (it will be echoed). Prompts go to stderr and the rows to stdout.
+Like `xor`, the phrase is never taken as a command-line argument — that would leave it in your shell history. Pass `--stdin` to pipe it in instead — the flag reads a pipe or a file, and is refused at a terminal, where typing would echo. Prompts go to stderr and the rows to stdout.
 
 All of stdin is the phrase, so it may wrap however your backup file happens to be written — two lines of 12, four lines of 6, one word per line. A newline carries no meaning inside a phrase, and reading only the first line would silently punch half a plate:
 
@@ -301,7 +301,8 @@ pre-commit install
 | `All parts must have the same word count` | Mixing a 12-word and a 24-word part — `xor` needs them the same length |
 | `Need at least 2 parts to XOR` | The list was ended with a blank line too early; enter at least two phrases |
 | `Parts cancel out` | Two parts are identical, or one equals the XOR of the others — the extra parts add no entropy, so use independent ones |
-| `stdin is not a terminal` | `xor` or `tinyseed` was piped or run from a script — pass `--stdin` (it will be echoed). `xor` reads one phrase per line; `tinyseed` reads the whole of stdin as one phrase, and `tinyseed --reverse` one plate row per line |
+| `stdin is not a terminal` | `xor` or `tinyseed` was piped or run from a script — pass `--stdin`. `xor` reads one phrase per line; `tinyseed` reads the whole of stdin as one phrase, and `tinyseed --reverse` one plate row per line |
+| `stdin is a terminal` | `--stdin` reads a pipe or a file, and typing at a terminal would echo the phrase into scrollback — drop the flag to be prompted with input hidden |
 | `tinyseed` circles look doubled or misaligned | The terminal renders `●`/`○` at double width (they are East Asian *Ambiguous*) — use `--style binary` |
 | A `tinyseed` number is one higher than `lookup` says | Correct: TinySeed numbers the wordlist 1–2048, `lookup` uses the BIP-39 index 0–2047 |
 | `Row N: Expected 12 positions, got 11` | A hole was missed or double-counted while reading row `N` — every row is exactly 12 positions, so count them again, in groups of three if it helps |
