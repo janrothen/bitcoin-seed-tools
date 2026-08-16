@@ -1,9 +1,9 @@
 from argparse import _SubParsersAction
 
-from seed_tools.tools import lookup, xor
+from seed_tools.tools import lookup, tinyseed, xor
 
 # Every tool module registers its own subcommand. Add new tools here.
-TOOLS = [lookup, xor]
+TOOLS = [lookup, tinyseed, xor]
 
 
 def register_all(subparsers: _SubParsersAction) -> None:

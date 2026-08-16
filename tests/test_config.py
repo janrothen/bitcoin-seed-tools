@@ -11,5 +11,11 @@ def test_config_declares_wordlist_files():
     assert asset(wordlist["printable_file"]).is_file()
 
 
+def test_config_declares_tinyseed_files():
+    tinyseed = config()["tinyseed"]
+    assert asset(tinyseed["file"]).is_file()
+    assert asset(tinyseed["reference_file"]).is_file()
+
+
 def test_config_is_cached():
     assert config() is config()

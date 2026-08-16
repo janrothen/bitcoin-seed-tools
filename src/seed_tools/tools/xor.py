@@ -1,13 +1,15 @@
 """Combine seed phrases by XOR-ing their entropy and recomputing the checksum."""
 
-import getpass
-import sys
 from argparse import ArgumentParser, Namespace, _SubParsersAction
 
+from seed_tools import phrase_input
 from seed_tools.mnemonic import MIN_PARTS, from_entropy, to_entropy, xor_entropy
 
 NAME = "xor"
 HELP = "combine seed phrases by XOR-ing their entropy and recomputing the checksum"
+
+# Several phrases, so here a newline is a separator and a blank line ends the list.
+STDIN_READS = "one phrase per line"
 
 
 def register(subparsers: _SubParsersAction) -> None:
@@ -26,18 +28,9 @@ def register(subparsers: _SubParsersAction) -> None:
 
 
 def run(args: Namespace) -> int:
-    if not args.stdin and not _stdin_is_tty():
-        raise ValueError(
-            "stdin is not a terminal — rerun interactively, or pass --stdin to read "
-            "one phrase per line"
-        )
-    try:
+    phrase_input.require_interactive_or_stdin(args.stdin, STDIN_READS)
+    with phrase_input.aborting():
         parts = _read_parts(args.stdin)
-    except (EOFError, KeyboardInterrupt):
-        # Ctrl-D or Ctrl-C at a prompt. Close the half-written line, then report
-        # it like any other input problem instead of unwinding as a traceback.
-        print(file=sys.stderr)
-        raise ValueError("Aborted — no result was produced") from None
 
     combined = xor_entropy(parts)
     _reject_degenerate(combined, parts)
@@ -71,7 +64,7 @@ def _reject_degenerate(combined: bytes, parts: list[bytes]) -> None:
 
 def _read_parts(use_stdin: bool) -> list[bytes]:
     """Read parts until a blank line, decoding each one as it is entered."""
-    read = _read_line_echoed if use_stdin else _read_line_hidden
+    read = phrase_input.line_reader(use_stdin)
     parts: list[bytes] = []
     while True:
         number = len(parts) + 1
@@ -91,17 +84,3 @@ def _prompt(number: int) -> str:
     if number <= MIN_PARTS:
         return f"Part {number}: "
     return f"Part {number} (blank to finish): "
-
-
-def _read_line_hidden(prompt: str) -> str:
-    return getpass.getpass(prompt)
-
-
-def _read_line_echoed(prompt: str) -> str:
-    # Prompt on stderr: stdout carries the result, which is often redirected.
-    print(prompt, end="", file=sys.stderr, flush=True)
-    return sys.stdin.readline()
-
-
-def _stdin_is_tty() -> bool:
-    return sys.stdin.isatty()

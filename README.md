@@ -38,13 +38,18 @@ src/seed_tools/
     config.py            # tomllib config loader
     wordlist.py          # BIP-39 wordlist: word ↔ index ↔ 11-bit binary
     mnemonic.py          # BIP-39 phrases: entropy ↔ words, checksum, XOR
+    tinyseed.py          # TinySeed plates: word ↔ 12-bit punch pattern
+    phrase_input.py      # reading a phrase from a terminal without echoing it
     tools/
         lookup.py        # `lookup` subcommand
+        tinyseed.py      # `tinyseed` subcommand
         xor.py           # `xor` subcommand
 tests/
 assets/
     bip-0039-english.txt      # BIP-39 English wordlist (2048 words)
     bip-0039-english-printable.txt  # printable table: index, binary, word
+    bip-0039-english-tinyseed.txt   # TinySeed table: number, word, binary, circles
+    bip-0039-tinyseed_io.pdf        # the printable reference card from tinyseed.io
 config.toml              # non-secret settings (asset paths)
 pyproject.toml
 ```
@@ -84,6 +89,49 @@ seed-tools lookup abandon 42 zeb
 ```
 
 Unknown terms print `no match` and the command exits with status `1`.
+
+### `tinyseed`
+
+Turn a seed phrase into the punch pattern for a [TinySeed](https://tinyseed.io) plate — a titanium card that stores a backup as drilled holes instead of letters, so it survives fire and water. Reading all 24 rows off the printed card by hand is slow and easy to get wrong, and a hole cannot be un-punched.
+
+TinySeed numbers the wordlist **1–2048** and punches that number in **12 bits**, most significant bit first. That is deliberately *not* the 11-bit index `lookup` prints: it is that index **plus one**, and only `zoo` (2048) sets the leading bit.
+
+```bash
+seed-tools tinyseed
+```
+
+The tool prompts once, without echoing, and prints one row per word — `○` to leave alone, `●` to punch:
+
+```
+Seed phrase:
+ 1  silent    ○●●○○●○○○●○○
+ 2  toe       ○●●●○○○●●●○●
+ 3  meat      ○●○○○●○●○○○●
+ …
+24  indoor    ○○●●●○○●●○○●
+```
+
+Add `--style binary` to print `1`/`0` instead. Use it if your terminal renders the circles at double width — `●` and `○` are East Asian *Ambiguous* characters, so a terminal configured for CJK will draw them wider than one column:
+
+```
+ 1  silent    011001000100
+```
+
+The phrase is verified before anything is printed: the word count and the BIP-39 checksum must both be right, so a mistyped or transposed word is caught before it reaches the plate. Bad input exits with status `2` and prints nothing.
+
+Like `xor`, the phrase is never taken as a command-line argument — that would leave it in your shell history. Pass `--stdin` to pipe it in instead (it will be echoed). Prompts go to stderr and the rows to stdout.
+
+All of stdin is the phrase, so it may wrap however your backup file happens to be written — two lines of 12, four lines of 6, one word per line. A newline carries no meaning inside a phrase, and reading only the first line would silently punch half a plate:
+
+```bash
+seed-tools tinyseed --stdin < backup.txt
+```
+
+Note this differs from `xor --stdin`, where a newline separates one part from the next.
+
+The full translation table ships as [assets/bip-0039-english-tinyseed.txt](assets/bip-0039-english-tinyseed.txt) (number, word, binary, circles), alongside the official printable card in [assets/bip-0039-tinyseed_io.pdf](assets/bip-0039-tinyseed_io.pdf). A test regenerates the table from the wordlist and compares it against the shipped file, so the two cannot drift apart.
+
+> **Read the plate back before you trust it.** Punch it, then decode the holes independently — with the printed card, or by comparing against this table — and confirm you recover the same phrase. Verify before the wallet holds anything.
 
 ### `xor`
 
@@ -138,6 +186,10 @@ Each tool is a module in [src/seed_tools/tools/](src/seed_tools/tools) exposing 
 [wordlist]
 file = "assets/bip-0039-english.txt"
 printable_file = "assets/bip-0039-english-printable.txt"
+
+[tinyseed]
+file = "assets/bip-0039-english-tinyseed.txt"
+reference_file = "assets/bip-0039-tinyseed_io.pdf"
 ```
 
 There is no `.env`: these tools need no credentials and make no network calls.
@@ -162,7 +214,7 @@ pre-commit install
 - Never enter a seed phrase that controls real funds on an internet-connected machine. Use an offline machine, or use test phrases only.
 - The tools never write a seed phrase to disk and never make network calls — but your shell does keep a history file. Clear it (or prefix commands with a space) after working with real words.
 - Never commit anything containing a real seed phrase. Nothing scans for that automatically — treat every test vector you add as public. The phrases in [tests/vectors.py](tests/vectors.py) are published specification vectors and are already compromised.
-- `xor` never echoes what you type and never writes it anywhere, but **Python cannot reliably wipe a phrase from process memory** — strings are immutable and may be copied by the interpreter or paged to swap. Treat the machine as contaminated afterwards: use an offline system and power it off when you are done.
+- `xor` and `tinyseed` never echo what you type and never write it anywhere, but **Python cannot reliably wipe a phrase from process memory** — strings are immutable and may be copied by the interpreter or paged to swap. Treat the machine as contaminated afterwards: use an offline system and power it off when you are done.
 - A Seed XOR result needs *every* part to reconstruct. Back up all of them, and never store a part in the same place as the combined phrase — that reduces the whole scheme to plaintext.
 
 ## Troubleshooting
@@ -180,7 +232,9 @@ pre-commit install
 | `All parts must have the same word count` | Mixing a 12-word and a 24-word part — `xor` needs them the same length |
 | `Need at least 2 parts to XOR` | The list was ended with a blank line too early; enter at least two phrases |
 | `Parts cancel out` | Two parts are identical, or one equals the XOR of the others — the extra parts add no entropy, so use independent ones |
-| `stdin is not a terminal` | `xor` was piped or run from a script — pass `--stdin` to accept one phrase per line (it will be echoed) |
+| `stdin is not a terminal` | `xor` or `tinyseed` was piped or run from a script — pass `--stdin` (it will be echoed). `xor` reads one phrase per line; `tinyseed` reads the whole of stdin as one phrase |
+| `tinyseed` circles look doubled or misaligned | The terminal renders `●`/`○` at double width (they are East Asian *Ambiguous*) — use `--style binary` |
+| A `tinyseed` number is one higher than `lookup` says | Correct: TinySeed numbers the wordlist 1–2048, `lookup` uses the BIP-39 index 0–2047 |
 | `command not found: seed-tools` | The virtualenv is not activated, or the package was installed elsewhere — run `source .venv/bin/activate` |
 | `ModuleNotFoundError: No module named 'seed_tools'` | Running `python -m seed_tools` outside the venv, or the package was never installed — run `pip install -e .` |
 

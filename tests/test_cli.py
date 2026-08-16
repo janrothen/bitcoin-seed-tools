@@ -4,6 +4,8 @@ import pytest
 from vectors import XOR_12_PARTS, XOR_12_RESULT, XOR_24_PARTS, XOR_24_RESULT
 
 from seed_tools.cli import main
+from seed_tools.mnemonic import from_entropy
+from seed_tools.wordlist import wordlist
 
 
 def _feed(monkeypatch, *phrases: str) -> io.StringIO:
@@ -21,8 +23,8 @@ def _prompts(monkeypatch, *replies: str) -> list[str]:
         seen.append(text)
         return replies[len(seen) - 1] if len(seen) <= len(replies) else ""
 
-    monkeypatch.setattr("seed_tools.tools.xor._stdin_is_tty", lambda: True)
-    monkeypatch.setattr("seed_tools.tools.xor._read_line_hidden", prompt)
+    monkeypatch.setattr("seed_tools.phrase_input.stdin_is_tty", lambda: True)
+    monkeypatch.setattr("seed_tools.phrase_input.read_line_hidden", prompt)
     return seen
 
 
@@ -146,9 +148,11 @@ def test_xor_prompts_without_echo_on_a_terminal(monkeypatch):
 
 
 def test_xor_refuses_a_non_terminal_without_the_stdin_flag(monkeypatch, caplog):
-    monkeypatch.setattr("seed_tools.tools.xor._stdin_is_tty", lambda: False)
+    monkeypatch.setattr("seed_tools.phrase_input.stdin_is_tty", lambda: False)
     assert main(["xor"]) == 2
     assert "not a terminal" in caplog.text
+    # xor's --stdin takes several phrases, so the newline is a separator here.
+    assert "one phrase per line" in caplog.text
 
 
 def test_xor_names_the_part_that_failed(monkeypatch, caplog):
@@ -178,16 +182,16 @@ def test_xor_stops_prompting_after_a_bad_part(capsys, monkeypatch, caplog):
 
 
 def test_xor_aborts_cleanly_on_end_of_input(monkeypatch, caplog):
-    monkeypatch.setattr("seed_tools.tools.xor._stdin_is_tty", lambda: True)
-    monkeypatch.setattr("seed_tools.tools.xor._read_line_hidden", _raise(EOFError))
+    monkeypatch.setattr("seed_tools.phrase_input.stdin_is_tty", lambda: True)
+    monkeypatch.setattr("seed_tools.phrase_input.read_line_hidden", _raise(EOFError))
     assert main(["xor"]) == 2
     assert "Aborted" in caplog.text
 
 
 def test_xor_aborts_cleanly_on_interrupt(monkeypatch, caplog):
-    monkeypatch.setattr("seed_tools.tools.xor._stdin_is_tty", lambda: True)
+    monkeypatch.setattr("seed_tools.phrase_input.stdin_is_tty", lambda: True)
     monkeypatch.setattr(
-        "seed_tools.tools.xor._read_line_hidden", _raise(KeyboardInterrupt)
+        "seed_tools.phrase_input.read_line_hidden", _raise(KeyboardInterrupt)
     )
     assert main(["xor"]) == 2
     assert "Aborted" in caplog.text
@@ -200,6 +204,149 @@ def test_xor_prompts_on_stderr_with_the_stdin_flag(capsys, monkeypatch):
     assert captured.err.startswith("Part 1: Part 2: ")
     # Prompts stay out of stdout, which carries the result.
     assert "Part 1:" not in captured.out
+
+
+def test_tinyseed_prints_a_line_per_word(capsys, monkeypatch):
+    _feed(monkeypatch, XOR_24_RESULT)
+    assert main(["tinyseed", "--stdin"]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert len(lines) == 24
+    assert lines[0] == " 1  silent    ○●●○○●○○○●○○"
+    assert lines[-1] == "24  indoor    ○○●●●○○●●○○●"
+
+
+def test_tinyseed_reads_a_phrase_wrapped_across_lines(capsys, monkeypatch):
+    """A backup stored as two lines of 12 is one phrase, not the first half of one."""
+    words = XOR_24_RESULT.split()
+    _feed(monkeypatch, " ".join(words[:12]), " ".join(words[12:]))
+    assert main(["tinyseed", "--stdin"]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert [line.split()[1] for line in lines] == words
+
+
+def test_tinyseed_reads_a_phrase_written_one_word_per_line(capsys, monkeypatch):
+    _feed(monkeypatch, *XOR_24_RESULT.split())
+    assert main(["tinyseed", "--stdin"]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert [line.split()[1] for line in lines] == XOR_24_RESULT.split()
+
+
+def test_tinyseed_does_not_silently_punch_half_a_plate(capsys, monkeypatch):
+    """The worst case for reading one line: the first 12 words checksum too.
+
+    A 24-word phrase can begin with a valid 12-word one — roughly 1 in 16 do.
+    Reading only the first line would print a plausible 12-row plate and exit 0,
+    and a hole cannot be un-punched. Built here rather than pasted, so no phrase
+    that has not already been published enters the repo.
+    """
+    words = _phrase_of_24_starting_with(XOR_12_RESULT).split()
+    assert words[:12] == XOR_12_RESULT.split()
+
+    _feed(monkeypatch, " ".join(words[:12]), " ".join(words[12:]))
+    assert main(["tinyseed", "--stdin"]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert [line.split()[1] for line in lines] == words
+
+
+def test_tinyseed_rejects_two_phrases_run_together(monkeypatch, caplog):
+    """Consuming all of stdin means a second phrase joins the first, not vanishes."""
+    _feed(monkeypatch, XOR_12_PARTS[0], XOR_12_PARTS[1])
+    assert main(["tinyseed", "--stdin"]) == 2
+    assert "Invalid checksum" in caplog.text
+
+
+def test_tinyseed_pattern_is_twelve_positions_of_circles(capsys, monkeypatch):
+    _feed(monkeypatch, XOR_12_PARTS[0])
+    assert main(["tinyseed", "--stdin"]) == 0
+    patterns = [line.split()[2] for line in capsys.readouterr().out.splitlines()]
+    assert len(patterns) == 12
+    assert all(len(p) == 12 and set(p) <= {"○", "●"} for p in patterns)
+
+
+def test_tinyseed_binary_style_agrees_with_the_circles(capsys, monkeypatch):
+    _feed(monkeypatch, XOR_12_PARTS[0])
+    assert main(["tinyseed", "--stdin"]) == 0
+    circles = [line.split()[2] for line in capsys.readouterr().out.splitlines()]
+
+    _feed(monkeypatch, XOR_12_PARTS[0])
+    assert main(["tinyseed", "--stdin", "--style", "binary"]) == 0
+    binary = [line.split()[2] for line in capsys.readouterr().out.splitlines()]
+
+    translated = ["".join("1" if c == "●" else "0" for c in p) for p in circles]
+    assert translated == binary
+
+
+def test_tinyseed_number_is_one_more_than_the_lookup_index(capsys, monkeypatch):
+    _feed(monkeypatch, XOR_24_RESULT)
+    assert main(["tinyseed", "--stdin", "--style", "binary"]) == 0
+    first = capsys.readouterr().out.splitlines()[0].split()[2]
+
+    assert main(["lookup", "silent"]) == 0
+    index = int(capsys.readouterr().out.split()[0])
+    assert int(first, 2) == index + 1
+
+
+def test_tinyseed_rejects_a_phrase_whose_checksum_is_wrong(monkeypatch, caplog):
+    # Two words transposed — the transcription slip this check exists to catch.
+    first, second, *rest = XOR_24_RESULT.split()
+    _feed(monkeypatch, " ".join([second, first, *rest]))
+    assert main(["tinyseed", "--stdin"]) == 2
+    assert "Invalid checksum" in caplog.text
+
+
+def test_tinyseed_rejects_a_wrong_word_count(monkeypatch, caplog):
+    _feed(monkeypatch, " ".join(XOR_24_RESULT.split()[:13]))
+    assert main(["tinyseed", "--stdin"]) == 2
+    assert "must be 12, 15, 18, 21 or 24 words" in caplog.text
+
+
+def test_tinyseed_rejects_an_unknown_style():
+    with pytest.raises(SystemExit):
+        main(["tinyseed", "--stdin", "--style", "squares"])
+
+
+def test_tinyseed_refuses_a_non_terminal_without_the_stdin_flag(monkeypatch, caplog):
+    monkeypatch.setattr("seed_tools.phrase_input.stdin_is_tty", lambda: False)
+    assert main(["tinyseed"]) == 2
+    assert "not a terminal" in caplog.text
+    # tinyseed's --stdin takes one phrase, so it must not promise xor's format.
+    assert "the whole phrase from stdin" in caplog.text
+    assert "per line" not in caplog.text
+
+
+def test_tinyseed_prompts_without_echo_on_a_terminal(capsys, monkeypatch):
+    prompts = _prompts(monkeypatch, XOR_12_PARTS[0])
+    assert main(["tinyseed"]) == 0
+    assert prompts == ["Seed phrase: "]
+    assert len(capsys.readouterr().out.splitlines()) == 12
+
+
+def test_tinyseed_prompts_on_stderr_with_the_stdin_flag(capsys, monkeypatch):
+    _feed(monkeypatch, XOR_12_PARTS[0])
+    assert main(["tinyseed", "--stdin"]) == 0
+    captured = capsys.readouterr()
+    assert captured.err.startswith("Seed phrase: ")
+    # The prompt stays out of stdout, which carries the patterns.
+    assert "Seed phrase" not in captured.out
+
+
+def test_tinyseed_aborts_cleanly_on_end_of_input(capsys, monkeypatch, caplog):
+    monkeypatch.setattr("seed_tools.phrase_input.stdin_is_tty", lambda: True)
+    monkeypatch.setattr("seed_tools.phrase_input.read_line_hidden", _raise(EOFError))
+    assert main(["tinyseed"]) == 2
+    assert "Aborted" in caplog.text
+    assert capsys.readouterr().out == ""
+
+
+def _phrase_of_24_starting_with(phrase: str) -> str:
+    """A valid 24-word phrase whose first 12 words are the given 12-word phrase.
+
+    Twelve words are 132 bits, and a 24-word phrase takes its first 132 bits from
+    entropy alone — so any 12-word phrase can open one. Zero-fill the remaining
+    124 bits and let `from_entropy` compute the checksum over the whole thing.
+    """
+    bits = "".join(wordlist().binary(word) for word in phrase.split())
+    return " ".join(from_entropy(int(bits.ljust(256, "0"), 2).to_bytes(32, "big")))
 
 
 def _raise(error: type[BaseException]):
