@@ -96,9 +96,17 @@ silent toe meat possible chair blossom wait occur this worth option bag nurse fi
 
 The numbered list is for transcribing onto a backup one word at a time; the final line repeats the same phrase in full for entering it into a wallet in one go.
 
-Every part's own checksum is verified as it is entered, so a mistyped or transposed word is caught before it can silently produce a different — and unrecoverable — wallet. Add `--entropy` to also print the combined entropy as hex, which is useful for cross-checking against another implementation.
+Every part's own checksum is verified the moment it is entered, so a mistyped or transposed word is caught before it can silently produce a different — and unrecoverable — wallet. A bad part stops the command right there, naming the part that failed, rather than letting you type the remaining ones first:
 
-All parts must have the same word count. The command refuses to emit a result when the parts cancel each other out, and exits with status `2` on any bad input.
+```
+Part 1:
+Part 2:
+ERROR seed_tools.cli: Part 2: Invalid checksum — check the words and their order
+```
+
+Add `--entropy` to also print the combined entropy as hex, which is useful for cross-checking against another implementation.
+
+All parts must have the same word count. The command refuses to emit a result when the parts cancel each other out, and exits with status `2` on any bad input. Prompts and errors go to stderr and the result to stdout, so redirecting stdout captures the phrase and nothing else. Ctrl-C or Ctrl-D at a prompt aborts without printing a result.
 
 > **This is not a threshold backup.** Every part is required forever — lose one and the wallet is gone. Any subset of parts reveals nothing about the result, which is exactly why you must never store a part alongside the combined phrase.
 
@@ -150,7 +158,8 @@ pre-commit install
 | `ValueError: Wordlist must contain 2048 words` | The wordlist file was edited or truncated — restore it from git |
 | `Not a BIP-39 word` | The word is not in the English wordlist; BIP-39 words are lowercase and unaccented |
 | `no match` for a valid-looking number | Indices are 0-based and stop at 2047 |
-| `Invalid checksum` | A word in that part is wrong or out of order — the last word encodes a checksum over all the others, so re-read the part carefully |
+| `Part N: Invalid checksum` | A word in part `N` is wrong or out of order — the last word encodes a checksum over all the others, so re-read that part carefully |
+| `Aborted — no result was produced` | Ctrl-C or Ctrl-D was pressed at a prompt; nothing was combined or printed |
 | `Seed phrase must be 12, 15, 18, 21 or 24 words` | A word was dropped or duplicated while typing the part |
 | `All parts must have the same word count` | Mixing a 12-word and a 24-word part — `xor` needs them the same length |
 | `Need at least 2 parts to XOR` | The list was ended with a blank line too early; enter at least two phrases |

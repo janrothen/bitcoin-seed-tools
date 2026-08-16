@@ -31,9 +31,14 @@ def run(args: Namespace) -> int:
             "stdin is not a terminal — rerun interactively, or pass --stdin to read "
             "one phrase per line"
         )
-    # Every part is checksum-verified here, so a mistyped word is caught before it
-    # can silently produce a different — and unrecoverable — wallet.
-    parts = [to_entropy(phrase) for phrase in _read_parts(args.stdin)]
+    try:
+        parts = _read_parts(args.stdin)
+    except (EOFError, KeyboardInterrupt):
+        # Ctrl-D or Ctrl-C at a prompt. Close the half-written line, then report
+        # it like any other input problem instead of unwinding as a traceback.
+        print(file=sys.stderr)
+        raise ValueError("Aborted — no result was produced") from None
+
     combined = xor_entropy(parts)
     _reject_degenerate(combined, parts)
 
@@ -64,14 +69,22 @@ def _reject_degenerate(combined: bytes, parts: list[bytes]) -> None:
         )
 
 
-def _read_parts(use_stdin: bool) -> list[str]:
+def _read_parts(use_stdin: bool) -> list[bytes]:
+    """Read parts until a blank line, decoding each one as it is entered."""
     read = _read_line_echoed if use_stdin else _read_line_hidden
-    parts: list[str] = []
+    parts: list[bytes] = []
     while True:
-        line = read(_prompt(len(parts) + 1))
+        number = len(parts) + 1
+        line = read(_prompt(number))
         if not line.strip():
             return parts
-        parts.append(line)
+        # Decoded here rather than after the whole list is in, so a mistyped word
+        # is caught while this part is still the one in front of the user, before
+        # the remaining parts are typed.
+        try:
+            parts.append(to_entropy(line))
+        except ValueError as error:
+            raise ValueError(f"Part {number}: {error}") from None
 
 
 def _prompt(number: int) -> str:
@@ -85,6 +98,8 @@ def _read_line_hidden(prompt: str) -> str:
 
 
 def _read_line_echoed(prompt: str) -> str:
+    # Prompt on stderr: stdout carries the result, which is often redirected.
+    print(prompt, end="", file=sys.stderr, flush=True)
     return sys.stdin.readline()
 
 
