@@ -338,6 +338,7 @@ pre-commit install
 ## Security
 
 - Never enter a seed phrase that controls real funds on an internet-connected machine. Use an offline machine, or use test phrases only.
+- Offline is not sufficient by itself — the machine also has to be one nobody else uses or administers. A keylogger, a screen recorder or a compromised shell profile does not need a network to be running while you type; it only needs one later, or the next time the disk is read. That rules out a work laptop, a shared family computer, a borrowed machine, and anything managed by someone else. Prefer hardware you control that has never been online, and treat *offline* as one requirement out of two rather than the whole answer.
 - Never share a seed phrase, and never share the output of these tools. A phrase is not a password you can rotate — whoever holds it holds the funds, immediately and irreversibly. Nobody legitimate ever needs it: not a wallet vendor, not an exchange, not a support agent, not a bug report, and not whoever answers you on X, Discord, Telegram or Reddit. Anyone asking for it is stealing from you.
 - The tools never write a seed phrase to disk and never make network calls — but your shell does keep a history file. Clear it (or prefix commands with a space) after working with real words.
 - Never commit anything containing a real seed phrase. Nothing scans for that automatically — treat every test vector you add as public. The phrases in [tests/vectors.py](tests/vectors.py) are published specification vectors and are already compromised.
