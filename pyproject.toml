@@ -25,7 +25,10 @@ packages = ["src/seed_tools"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--cov=src/seed_tools --cov-report=term-missing --cov-config=pyproject.toml"
+addopts = "--cov=src/seed_tools --cov-report=term-missing --cov-report=xml --cov-config=pyproject.toml"
+
+[tool.coverage.run]
+relative_files = true
 
 [tool.ruff]
 target-version = "py313"
