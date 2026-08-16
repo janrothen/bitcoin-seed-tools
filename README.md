@@ -96,7 +96,7 @@ Unknown terms print `no match`; like `grep`, the command exits with status `1` o
 
 ### `tinyseed`
 
-Turn a seed phrase into the punch pattern for a [TinySeed](https://tinyseed.io) plate — a titanium card that stores a backup as drilled holes instead of letters, so it survives fire and water. Reading all 24 rows off the printed card by hand is slow and easy to get wrong, and a hole cannot be un-punched. It goes both ways: `--reverse` [reads a punched plate back](#reading-a-plate-back) so you can check what you actually engraved.
+Turn a seed phrase into the punch pattern for a [TinySeed](https://tinyseed.io) plate — a titanium card that stores a backup as drilled holes instead of letters, so it survives fire and water. The plate is punched front and back, 12 words to a side: a 12-word phrase fills the front, a 24-word one carries on over the back. Reading all 24 rows off the printed card by hand is slow and easy to get wrong, and a hole cannot be un-punched. It goes both ways: `--reverse` [reads a punched plate back](#reading-a-plate-back) so you can check what you actually engraved.
 
 TinySeed numbers the wordlist **1–2048** and punches that number in **12 bits**, most significant bit first. That is deliberately *not* the 11-bit index `lookup` prints: it is that index **plus one**, and only `zoo` (2048) sets the leading bit.
 
@@ -159,18 +159,18 @@ Row 13 (blank to finish):
 silent toe meat …
 ```
 
-A blank line ends the list. One plate holds 12 rows, so a 24-word phrase runs across two of them — keep going past row 12 and finish with a blank line there instead.
+A blank line ends the list. A side of the plate holds 12 rows, so a 24-word phrase runs across both — keep going past row 12 and finish with a blank line there instead.
 
 Stopping at exactly 12 rows is the one ambiguous case, so it takes a second blank line to confirm:
 
 ```
 Row 13 (blank to finish):
-— 12 rows read, which is one full plate. A 24-word phrase spans two: carry on
-with the next plate, or press Enter again to finish here.
+— 12 rows read, which is one full side of the plate. A 24-word phrase fills
+both: turn the plate over and carry on, or press Enter again to finish here.
 Row 13 (blank to finish):
 ```
 
-That is there because row 12 is where you put one plate down and pick up the next, and an Enter pressed in that pause would otherwise end the read at twelve words — which pass the checksum roughly once in sixteen and would then be printed as though they were the whole phrase.
+That is there because row 12 is where you turn the plate over, and an Enter pressed in that pause would otherwise end the read at twelve words — which pass the checksum roughly once in sixteen and would then be printed as though they were the whole phrase.
 
 Since `●` and `○` are not on a keyboard, a row may be written any of these ways, and they may be mixed within a row:
 
@@ -189,7 +189,7 @@ Unlike every other prompt in this project, **this one echoes what you type** —
 seed-tools tinyseed --reverse --stdin < plate.txt
 ```
 
-Piped like this the file's own end is what stops the read, so a blank line in it is only the gap between two plates and is skipped — write 24 rows as twelve, a gap, and twelve more if that is how you copied them down. (Typed at the prompt there is no end-of-file to wait for, so there a blank line still ends the list.)
+Piped like this the file's own end is what stops the read, so a blank line in it is only the gap between the front and the back of the plate and is skipped — write 24 rows as twelve, a gap, and twelve more if that is how you copied them down. (Typed at the prompt there is no end-of-file to wait for, so there a blank line still ends the list.)
 
 > Verify before the wallet holds anything. Read the plate you just punched, not the phrase you meant to punch — the point is to catch the difference.
 

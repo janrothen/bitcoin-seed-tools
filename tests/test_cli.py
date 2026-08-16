@@ -316,7 +316,7 @@ def test_tinyseed_does_not_silently_punch_half_a_plate(capsys, monkeypatch):
     """The worst case for reading one line: the first 12 words checksum too.
 
     A 24-word phrase can begin with a valid 12-word one — roughly 1 in 16 do.
-    Reading only the first line would print a plausible 12-row plate and exit 0,
+    Reading only the first line would print a plausible 12-row side and exit 0,
     and a hole cannot be un-punched. Built here rather than pasted, so no phrase
     that has not already been published enters the repo.
     """
@@ -449,18 +449,18 @@ def test_tinyseed_survives_the_round_trip_through_a_plate(capsys, monkeypatch):
     assert capsys.readouterr().out.splitlines()[-1] == XOR_24_RESULT
 
 
-def test_tinyseed_reverse_reads_two_plates_as_one_phrase(capsys, monkeypatch):
-    """A 24-word phrase spans two plates; 24 rows are still one phrase."""
+def test_tinyseed_reverse_reads_both_sides_as_one_phrase(capsys, monkeypatch):
+    """A 24-word phrase fills both sides of a plate; 24 rows are still one phrase."""
     _feed(monkeypatch, *_plate(XOR_24_RESULT))
     assert main(["tinyseed", "--reverse", "--stdin"]) == 0
     assert capsys.readouterr().out.splitlines()[-1] == XOR_24_RESULT
 
 
-def test_tinyseed_reverse_reads_two_plates_written_as_two_blocks(capsys, monkeypatch):
-    """Piped, a blank line between the plates is a gap in the paper, not the end.
+def test_tinyseed_reverse_reads_both_sides_written_as_two_blocks(capsys, monkeypatch):
+    """Piped, a blank line between the sides is a gap in the paper, not the end.
 
-    The file's own end says where the rows stop, so the natural way to write two
-    plates down — twelve rows, a gap, twelve more — has to read back whole.
+    The file's own end says where the rows stop, so the natural way to write both
+    sides down — twelve rows, a gap, twelve more — has to read back whole.
     """
     rows = _plate(XOR_24_RESULT)
     _feed(monkeypatch, *rows[:12], "", *rows[12:])
@@ -485,7 +485,7 @@ def test_tinyseed_reverse_does_not_stop_at_a_gap_that_checksums(capsys, monkeypa
 def test_tinyseed_reverse_ends_a_typed_list_at_a_blank_line(capsys, monkeypatch):
     """Typed, a blank line is still the only way to say "that was the last row".
 
-    One full plate is the exception: stopping there is ambiguous, so it takes a
+    One full side is the exception: stopping there is ambiguous, so it takes a
     second blank line to confirm. Anything after that is not read.
     """
     rows = _plate(XOR_12_PARTS[0])
@@ -497,9 +497,9 @@ def test_tinyseed_reverse_ends_a_typed_list_at_a_blank_line(capsys, monkeypatch)
 def test_tinyseed_reverse_does_not_end_a_typed_list_at_the_plate_seam(
     capsys, monkeypatch
 ):
-    """A stray Enter while reaching for the second plate must not end the read.
+    """A stray Enter while turning the plate over must not end the read.
 
-    Twelve rows is where a 24-word phrase changes plates, and the first twelve
+    Twelve rows is where a 24-word phrase changes sides, and the first twelve
     words pass the checksum once in sixteen — so ending there can look like a
     clean read of a phrase nobody has.
     """
@@ -513,13 +513,13 @@ def test_tinyseed_reverse_says_why_it_kept_prompting_at_the_seam(capsys, monkeyp
     rows = _plate(XOR_24_RESULT)
     _rows(monkeypatch, *rows[:12], "\n", *rows[12:])
     assert main(["tinyseed", "--reverse"]) == 0
-    assert "one full plate" in capsys.readouterr().err
+    assert "one full side of the plate" in capsys.readouterr().err
 
 
 def test_tinyseed_reverse_does_not_end_a_typed_list_at_eof_at_the_seam(
     capsys, monkeypatch
 ):
-    """Ctrl-D while reaching for the second plate must not end the read either.
+    """Ctrl-D while turning the plate over must not end the read either.
 
     `readline` returns "" for Ctrl-D at a prompt, which must face the same seam
     check as a stray Enter — the truncated read it would otherwise allow passes
@@ -617,7 +617,7 @@ def test_tinyseed_reverse_prompts_row_by_row(capsys, monkeypatch):
     assert main(["tinyseed", "--reverse"]) == 0
     assert prompts[0] == "Row 1: "
     assert prompts[11] == "Row 12: "
-    # One plate ends at row 12, so from there on the prompt says how to stop.
+    # A side ends at row 12, so from there on the prompt says how to stop.
     assert prompts[12] == "Row 13 (blank to finish): "
     assert prompts[-1] == "Row 25 (blank to finish): "
     assert capsys.readouterr().out.splitlines()[-1] == XOR_24_RESULT
