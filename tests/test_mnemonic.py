@@ -9,9 +9,12 @@ from vectors import (
 
 from seed_tools.mnemonic import (
     ENTROPY_SIZES,
+    PARTIAL_WORD_COUNTS,
     WORD_COUNTS,
     checksum_bits,
     entropy_bits,
+    final_word_entropy_bits,
+    final_words,
     from_entropy,
     normalize,
     to_entropy,
@@ -112,6 +115,52 @@ def test_bad_word_count_rejected(words):
 def test_bad_entropy_length_rejected(words):
     with pytest.raises(ValueError, match="must be 16, 20, 24, 28 or 32 bytes"):
         from_entropy(bytes(17), words)
+
+
+def test_final_word_carries_entropy_as_well_as_the_checksum():
+    """11 bits minus the checksum — the reason there is never just one answer."""
+    assert final_word_entropy_bits(12) == 7
+    assert final_word_entropy_bits(24) == 3
+
+
+@pytest.mark.parametrize("count", PARTIAL_WORD_COUNTS)
+def test_final_words_offers_one_candidate_per_free_bit_pattern(words, count):
+    candidates = final_words(["abandon"] * count, words)
+    assert len(candidates) == 2 ** final_word_entropy_bits(count + 1)
+    # Distinct and sorted: the free bits sit above the checksum bits inside the
+    # word's index, so no two patterns can land on the same word.
+    assert candidates == sorted(set(candidates))
+
+
+@pytest.mark.parametrize(("entropy_hex", "mnemonic"), BIP39_VECTORS)
+def test_final_words_contains_the_published_last_word(words, entropy_hex, mnemonic):
+    *head, last = mnemonic.split()
+    assert last in final_words(head, words)
+
+
+@pytest.mark.parametrize("count", PARTIAL_WORD_COUNTS)
+def test_every_candidate_completes_a_phrase_that_decodes(words, count):
+    """The claim the tool makes: append any one of these and the checksum holds."""
+    head = ["abandon"] * count
+    for candidate in final_words(head, words):
+        to_entropy([*head, candidate], words)
+
+
+def test_final_words_keeps_the_given_words(words):
+    """Only the last word is ours to choose; the rest must come back untouched."""
+    head = XOR_12_RESULT.split()[:11]
+    for candidate in final_words(head, words):
+        assert from_entropy(to_entropy([*head, candidate], words), words)[:11] == head
+
+
+def test_final_words_rejects_a_complete_phrase(words):
+    with pytest.raises(ValueError, match="must be 11, 14, 17, 20 or 23 words"):
+        final_words(XOR_12_RESULT, words)
+
+
+def test_final_words_rejects_an_unknown_word(words):
+    with pytest.raises(ValueError, match="Word 11 is not a BIP-39 word"):
+        final_words(["abandon"] * 10 + ["bitcoin"], words)
 
 
 def test_xor_needs_two_parts():

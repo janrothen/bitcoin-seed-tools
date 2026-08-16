@@ -20,6 +20,7 @@ src/seed_tools/
     phrase_input.py      # prompting for a phrase without echoing it
     tools/
         __init__.py      # TOOLS registry — add new tool modules here
+        checksum.py      # `checksum` subcommand
         lookup.py        # `lookup` subcommand
         tinyseed.py      # `tinyseed` subcommand
         xor.py           # `xor` subcommand
@@ -87,8 +88,8 @@ Register it in `TOOLS` in `tools/__init__.py`. `cli.py` stays untouched.
   hidden by default, `--stdin` to pipe it in. Call it as
   `phrase_input.stdin_is_tty()` (module attribute), not via `from ... import`,
   or the tests can no longer patch it.
-- Pick the reader by how many phrases the tool takes. One phrase (`tinyseed`):
-  `phrase_reader`, which consumes all of stdin — a newline is ordinary
+- Pick the reader by how many phrases the tool takes. One phrase (`tinyseed`,
+  `checksum`): `phrase_reader`, which consumes all of stdin — a newline is ordinary
   whitespace inside a phrase, and reading one line would silently drop the rest
   of a wrapped backup. Several phrases (`xor`): `line_reader`, where a newline
   separates entries. Each tool passes its own `STDIN_READS` to
