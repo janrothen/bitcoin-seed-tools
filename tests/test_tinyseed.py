@@ -54,6 +54,78 @@ def test_pattern_rejects_an_unknown_style():
         tinyseed.pattern(1, "dots")
 
 
+@pytest.mark.parametrize("style", sorted(tinyseed.STYLES))
+def test_reading_a_pattern_back_recovers_every_plate_number(style):
+    """The round trip has to hold for all 2048 rows, not a sample of them."""
+    for number in range(tinyseed.MIN_NUMBER, tinyseed.MAX_NUMBER + 1):
+        assert tinyseed.read_pattern(tinyseed.pattern(number, style)) == number
+
+
+def test_known_circle_patterns_read_back_to_their_words(words):
+    assert tinyseed.read_word(FIRST, words) == "abandon"
+    assert tinyseed.read_word(SECOND, words) == "ability"
+    assert tinyseed.read_word(LAST, words) == "zoo"
+
+
+def test_every_notation_reads_back_to_the_same_word(words):
+    """Circles, binary and the typeable stand-ins are one pattern, written three ways."""
+    for written in ("○○○○○○○●○○○●", "000000010001", ".......#...#", "oooooooXooo#"):
+        assert tinyseed.read_word(written, words) == "acoustic"
+
+
+def test_notations_may_be_mixed_within_a_row(words):
+    """The glyph sets do not overlap, so a half-typed row is still unambiguous."""
+    assert tinyseed.read_word("○○○○○○○1ooo#", words) == "acoustic"
+
+
+def test_spaces_group_a_row_without_changing_it(words):
+    assert tinyseed.read_pattern("○○○ ○○○ ○○○ ○○●") == 1
+    assert tinyseed.read_word("0000 0001 0001", words) == "acoustic"
+
+
+@pytest.mark.parametrize("written", ["○○○○○○○○○○●", "○○○○○○○○○○○●○", ""])
+def test_reading_rejects_a_row_that_is_not_twelve_positions(written):
+    with pytest.raises(ValueError, match="Expected 12 positions"):
+        tinyseed.read_pattern(written)
+
+
+def test_a_rejected_row_is_not_repeated_back_in_the_error():
+    """Errors are logged, and a row one hole short is still most of a word."""
+    almost = "○○○○○○○●○○●"
+    with pytest.raises(ValueError) as raised:
+        tinyseed.read_pattern(almost)
+    assert almost not in str(raised.value)
+
+
+def test_reading_rejects_a_mark_it_does_not_know_and_says_where():
+    with pytest.raises(ValueError, match="position 5: 'q'"):
+        tinyseed.read_pattern("○○○○q○○○○○○●")
+
+
+def test_reading_rejects_a_row_with_no_holes():
+    """An all-blank row means a skipped row, not a word — no word is 0."""
+    with pytest.raises(ValueError, match="no holes"):
+        tinyseed.read_pattern(tinyseed.CIRCLE_OFF * tinyseed.PLATE_BITS)
+
+
+def test_reading_rejects_a_pattern_past_the_end_of_the_wordlist():
+    """12 bits reach 4095; a fifth of what a plate can hold names no word."""
+    with pytest.raises(ValueError, match="out of range"):
+        tinyseed.read_pattern("●●●●●●●●●●●●")
+
+
+def test_every_glyph_that_can_be_drawn_can_also_be_read():
+    """A style added later must not be printable but unreadable."""
+    for zero, one in tinyseed.STYLES.values():
+        assert zero in tinyseed.READ_OFF
+        assert one in tinyseed.READ_ON
+
+
+def test_the_off_and_on_marks_never_overlap():
+    """What makes detecting the notation safe rather than a guess."""
+    assert not tinyseed.READ_OFF & tinyseed.READ_ON
+
+
 def test_table_covers_the_whole_wordlist(words):
     rows = tinyseed.table(words)
     assert len(rows) == len(words)
