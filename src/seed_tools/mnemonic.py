@@ -44,7 +44,7 @@ def to_entropy(phrase: str | Sequence[str], words: Wordlist | None = None) -> by
     bits = "".join(_binary(words, mnemonic))
     split = entropy_bits(len(mnemonic))
     entropy = int(bits[:split], 2).to_bytes(split // 8, "big")
-    if bits[split:] != checksum_bits(entropy):
+    if not bits.endswith(checksum_bits(entropy)):
         raise ValueError("Invalid checksum — check the words and their order")
     return entropy
 

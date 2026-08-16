@@ -124,7 +124,7 @@ def _read_rows(use_stdin: bool) -> list[str]:
             if use_stdin:
                 if not line:
                     # End of the pipe — no more rows are coming.
-                    return words
+                    break
                 # A blank line in a pipe is only the gap between two plates.
                 continue
             # Typed, a blank line and Ctrl-D land here alike: `readline` returns
@@ -143,13 +143,14 @@ def _read_rows(use_stdin: bool) -> list[str]:
                 seam_seen = True
                 print(SEAM_NOTICE, file=sys.stderr)
                 continue
-            return words
+            break
         # Decoded here rather than once the whole plate is in, so a miscounted
         # row is reported while that row is still the one under the reader's eye.
         try:
             words.append(tinyseed.read_word(line))
         except ValueError as error:
             raise ValueError(f"Row {number}: {error}") from None
+    return words
 
 
 def _prompt(number: int, use_stdin: bool) -> str:

@@ -87,11 +87,11 @@ def _read_parts(use_stdin: bool) -> list[bytes]:
         line = read(_prompt(number, use_stdin))
         if not line:
             # End of input — no more parts are coming, however they were fed in.
-            return parts
+            break
         if not line.strip():
             if use_stdin:
                 continue
-            return parts
+            break
         # Decoded here rather than after the whole list is in, so a mistyped word
         # is caught while this part is still the one in front of the user, before
         # the remaining parts are typed.
@@ -99,6 +99,7 @@ def _read_parts(use_stdin: bool) -> list[bytes]:
             parts.append(to_entropy(line))
         except ValueError as error:
             raise ValueError(f"Part {number}: {error}") from None
+    return parts
 
 
 def _prompt(number: int, use_stdin: bool) -> str:
