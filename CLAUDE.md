@@ -77,6 +77,13 @@ Register it in `TOOLS` in `tools/__init__.py`. `cli.py` stays untouched.
   of a wrapped backup. Several phrases (`xor`): `line_reader`, where a newline
   separates entries. Each tool passes its own `STDIN_READS` to
   `require_interactive_or_stdin` so the error describes that tool's format.
+- Any tool reading a *list* of entries ends it the same way, and the two sources
+  differ. Piped, only end-of-input ends the list — a blank line there is a gap
+  in the file and is skipped. Typed, a blank line is the only terminator there
+  is, so it ends the list. Getting this wrong does not raise: a truncated list
+  of parts or rows re-checksums into a plausible phrase that is not the one the
+  input described. `xor._read_parts` and `tinyseed._read_rows` both do it this
+  way; copy that shape rather than inventing a third.
 - Hidden input has exactly one exception, `row_reader` (`tinyseed --reverse`):
   what is typed there is holes being checked against the plate in the reader's
   hand, and a transcription that cannot be seen cannot be proofread. Do not copy

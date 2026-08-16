@@ -34,7 +34,10 @@ def run(args: Namespace) -> int:
 
 
 def _resolve(words: Wordlist, term: str) -> list[str]:
-    if term.isdigit():
+    # `isascii` first: `isdigit` is also true of superscripts and other digit
+    # characters `int` will not parse, and those belong in the prefix search
+    # that reports "no match" rather than in an error about literals.
+    if term.isascii() and term.isdigit():
         index = int(term)
         return [words.word(index)] if 0 <= index < len(words) else []
     if words.contains(term):

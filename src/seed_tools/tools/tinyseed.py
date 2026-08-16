@@ -1,5 +1,6 @@
 """Print the TinySeed plate punch pattern for each word of a seed phrase."""
 
+import sys
 from argparse import ArgumentParser, Namespace, _SubParsersAction
 
 from seed_tools import phrase_input, tinyseed
@@ -19,6 +20,13 @@ STDIN_READS = "the whole phrase from stdin"
 
 # Reading back, a newline separates one row of the plate from the next.
 REVERSE_STDIN_READS = "one plate row per line"
+
+# Shown when a typed list stops at exactly one full plate — see `_read_rows`.
+SEAM_NOTICE = (
+    f"— {tinyseed.PLATE_ROWS} rows read, which is one full plate. A 24-word "
+    "phrase spans two: carry on with the next plate, or press Enter again to "
+    "finish here."
+)
 
 
 def register(subparsers: _SubParsersAction) -> None:
@@ -108,6 +116,7 @@ def _read_rows(use_stdin: bool) -> list[str]:
     """
     read = phrase_input.row_reader()
     words: list[str] = []
+    seam_seen = False
     while True:
         number = len(words) + 1
         line = read(_prompt(number, use_stdin))
@@ -116,6 +125,18 @@ def _read_rows(use_stdin: bool) -> list[str]:
             return words
         if not line.strip():
             if use_stdin:
+                continue
+            # One full plate is the single ambiguous place to stop: a 12-word
+            # phrase ends here, and so does the first half of a 24-word one.
+            # Reading two plates means a pause at the seam to pick up the
+            # second, and an Enter pressed in that pause would otherwise end
+            # the list — leaving twelve words that pass the checksum once in
+            # sixteen and get printed as the whole phrase. That is the misread
+            # this subcommand exists to catch, so say so once and keep the
+            # prompt open; a second blank line means it really was one plate.
+            if len(words) == tinyseed.PLATE_ROWS and not seam_seen:
+                seam_seen = True
+                print(SEAM_NOTICE, file=sys.stderr)
                 continue
             return words
         # Decoded here rather than once the whole plate is in, so a miscounted

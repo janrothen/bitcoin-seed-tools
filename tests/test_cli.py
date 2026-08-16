@@ -54,6 +54,12 @@ def test_out_of_range_index_reports_no_match(capsys):
     assert "no match" in capsys.readouterr().out
 
 
+def test_non_ascii_digit_reports_no_match(capsys):
+    """`isdigit` is true of superscripts too, but `int` will not parse them."""
+    assert main(["lookup", "²"]) == 1
+    assert "no match" in capsys.readouterr().out
+
+
 def test_value_error_is_reported_not_raised(monkeypatch, caplog):
     def boom(_args):
         raise ValueError("bad input")
@@ -131,7 +137,39 @@ def test_xor_rejects_mixed_word_counts(monkeypatch, caplog):
 def test_xor_rejects_a_mistyped_word(monkeypatch, caplog):
     _feed(monkeypatch, XOR_24_PARTS[0].replace("romance", "romanse"), XOR_24_PARTS[1])
     assert main(["xor", "--stdin"]) == 2
-    assert "Not a BIP-39 word" in caplog.text
+    assert "Part 1: Word 1 is not a BIP-39 word" in caplog.text
+
+
+def test_xor_does_not_log_the_mistyped_word(monkeypatch, caplog):
+    """Errors reach a log, and what was typed at a seed prompt stays out of it."""
+    _feed(monkeypatch, XOR_24_PARTS[0].replace("romance", "romanse"), XOR_24_PARTS[1])
+    assert main(["xor", "--stdin"]) == 2
+    assert "romanse" not in caplog.text
+
+
+def test_xor_reads_parts_written_as_separated_blocks(capsys, monkeypatch):
+    """Piped, a blank line between parts is a gap in the file, not the end.
+
+    Stopping there would combine the first two parts alone, and their XOR is a
+    different phrase carrying a valid checksum of its own — so neither the
+    round-trip self-check nor the reader has anything to notice.
+    """
+    _feed(monkeypatch, *XOR_24_PARTS[:2], "", XOR_24_PARTS[2])
+    assert main(["xor", "--stdin"]) == 0
+    assert capsys.readouterr().out.splitlines()[-1] == XOR_24_RESULT
+
+
+def test_xor_ignores_blank_lines_around_the_parts(capsys, monkeypatch):
+    _feed(monkeypatch, "", *XOR_12_PARTS, "", "")
+    assert main(["xor", "--stdin"]) == 0
+    assert capsys.readouterr().out.splitlines()[-1] == XOR_12_RESULT
+
+
+def test_xor_reports_how_many_parts_it_combined(capsys, monkeypatch):
+    """A phrase wrapped across lines reads as short parts; the counts show it."""
+    _feed(monkeypatch, *XOR_24_PARTS)
+    assert main(["xor", "--stdin"]) == 0
+    assert "Combined 3 parts of 24 words." in capsys.readouterr().err
 
 
 def test_xor_rejects_a_part_whose_checksum_is_wrong(monkeypatch, caplog):
@@ -395,12 +433,37 @@ def test_tinyseed_reverse_does_not_stop_at_a_gap_that_checksums(capsys, monkeypa
 
 
 def test_tinyseed_reverse_ends_a_typed_list_at_a_blank_line(capsys, monkeypatch):
-    """Typed, a blank line is still the only way to say "that was the last row"."""
+    """Typed, a blank line is still the only way to say "that was the last row".
+
+    One full plate is the exception: stopping there is ambiguous, so it takes a
+    second blank line to confirm. Anything after that is not read.
+    """
     rows = _plate(XOR_12_PARTS[0])
-    # Anything after the blank line is not read: at a prompt, blank means done.
-    _rows(monkeypatch, *rows, "\n", *_plate(XOR_12_PARTS[1]))
+    _rows(monkeypatch, *rows, "\n", "\n", *_plate(XOR_12_PARTS[1]))
     assert main(["tinyseed", "--reverse"]) == 0
     assert capsys.readouterr().out.splitlines()[-1] == XOR_12_PARTS[0]
+
+
+def test_tinyseed_reverse_does_not_end_a_typed_list_at_the_plate_seam(
+    capsys, monkeypatch
+):
+    """A stray Enter while reaching for the second plate must not end the read.
+
+    Twelve rows is where a 24-word phrase changes plates, and the first twelve
+    words pass the checksum once in sixteen — so ending there can look like a
+    clean read of a phrase nobody has.
+    """
+    rows = _plate(XOR_24_RESULT)
+    _rows(monkeypatch, *rows[:12], "\n", *rows[12:])
+    assert main(["tinyseed", "--reverse"]) == 0
+    assert capsys.readouterr().out.splitlines()[-1] == XOR_24_RESULT
+
+
+def test_tinyseed_reverse_says_why_it_kept_prompting_at_the_seam(capsys, monkeypatch):
+    rows = _plate(XOR_24_RESULT)
+    _rows(monkeypatch, *rows[:12], "\n", *rows[12:])
+    assert main(["tinyseed", "--reverse"]) == 0
+    assert "one full plate" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize("style", sorted(tinyseed.STYLES))

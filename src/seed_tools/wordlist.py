@@ -15,6 +15,16 @@ class Wordlist:
             raise ValueError(
                 f"Wordlist must contain {WORDLIST_SIZE} words, got {len(words)}"
             )
+        # The count alone does not make a wordlist, and the two ways it can be
+        # wrong while still counting to 2048 both fail silently. A duplicated
+        # entry breaks the word ↔ index bijection. A transposed pair keeps the
+        # bijection intact, so a phrase encoded against it round-trips cleanly
+        # here and is still unrecoverable in every other wallet — the worst
+        # possible failure for this tool, and invisible without these two lines.
+        if len(set(words)) != WORDLIST_SIZE:
+            raise ValueError("Wordlist contains duplicate words")
+        if words != sorted(words):
+            raise ValueError("Wordlist is not in sorted order")
         self._words = words
         self._indices = {word: index for index, word in enumerate(words)}
 
@@ -35,7 +45,13 @@ class Wordlist:
         try:
             return self._indices[word]
         except KeyError:
-            raise ValueError(f"Not a BIP-39 word: {word}") from None
+            # The word is not repeated back. Errors reach a log, and a word
+            # typed at a seed prompt is a near-miss of a real one — naming it
+            # pins that position to a single candidate. Callers that know where
+            # the word sat (`mnemonic.to_entropy`) report the position instead,
+            # the same way `tinyseed.read_pattern` names a position and never a
+            # number.
+            raise ValueError("Not a BIP-39 word") from None
 
     def binary(self, word: str) -> str:
         return format(self.index(word), f"0{INDEX_BITS}b")
