@@ -660,6 +660,83 @@ def test_tinyseed_reverse_aborts_cleanly_on_interrupt(capsys, monkeypatch, caplo
     assert capsys.readouterr().out == ""
 
 
+def test_tinyseed_reverse_reads_the_rows_from_a_file(capsys, tmp_path):
+    """A plate copied down once can be checked without retyping it."""
+    plate = _plate_file(tmp_path, _plate(XOR_12_PARTS[0]))
+    assert main(["tinyseed", "--reverse", "--file", str(plate)]) == 0
+
+    lines = capsys.readouterr().out.splitlines()
+    assert [line.split()[1] for line in lines[:12]] == XOR_12_PARTS[0].split()
+    assert lines[-1] == XOR_12_PARTS[0]
+
+
+def test_tinyseed_reverse_reads_a_file_of_both_sides_split_by_a_gap(capsys, tmp_path):
+    """A file ends itself, so a blank line in it is the gap between the sides.
+
+    The phrase here is one whose first twelve words checksum on their own, which
+    is what makes stopping at the gap dangerous: it would exit 0 on a clean read
+    of a backup nobody has.
+    """
+    phrase = _phrase_of_24_starting_with(XOR_12_PARTS[0])
+    rows = _plate(phrase)
+    plate = _plate_file(tmp_path, [*rows[:12], "", *rows[12:]])
+    assert main(["tinyseed", "--reverse", "--file", str(plate)]) == 0
+    assert capsys.readouterr().out.splitlines()[-1] == phrase
+
+
+def test_tinyseed_reverse_reads_a_file_at_a_terminal(capsys, monkeypatch, tmp_path):
+    """The file is the input, so neither the prompt nor stdin is involved."""
+    monkeypatch.setattr("seed_tools.phrase_input.stdin_is_tty", lambda: True)
+    monkeypatch.setattr(
+        "seed_tools.phrase_input.read_line_hidden", _raise(AssertionError)
+    )
+    monkeypatch.setattr(
+        "seed_tools.phrase_input.read_line_echoed", _raise(AssertionError)
+    )
+    plate = _plate_file(tmp_path, _plate(XOR_24_RESULT))
+    assert main(["tinyseed", "--reverse", "--file", str(plate)]) == 0
+
+    out = capsys.readouterr()
+    assert out.out.splitlines()[-1] == XOR_24_RESULT
+    # Nobody is at the keyboard, so nothing asks for a row.
+    assert "Row 1: " not in out.err
+
+
+def test_tinyseed_reverse_says_which_row_of_a_file_it_could_not_read(tmp_path, caplog):
+    rows = _plate(XOR_12_PARTS[0])
+    rows[2] = rows[2][:-1]
+    plate = _plate_file(tmp_path, rows)
+    assert main(["tinyseed", "--reverse", "--file", str(plate)]) == 2
+    assert "Row 3: Expected 12 positions, got 11" in caplog.text
+
+
+def test_tinyseed_reverse_reports_a_file_it_cannot_read(capsys, tmp_path, caplog):
+    missing = tmp_path / "nowhere.txt"
+    assert main(["tinyseed", "--reverse", "--file", str(missing)]) == 2
+    assert f"Cannot read {missing}" in caplog.text
+    assert capsys.readouterr().out == ""
+
+
+def test_tinyseed_reverse_reports_a_file_that_is_not_text(tmp_path, caplog):
+    """A wrong path can land on anything; it must not come back as a traceback."""
+    plate = tmp_path / "plate.bin"
+    plate.write_bytes(bytes(range(256)))
+    assert main(["tinyseed", "--reverse", "--file", str(plate)]) == 2
+    assert "is not a text file" in caplog.text
+
+
+def test_tinyseed_refuses_a_file_in_the_punching_direction(tmp_path, caplog):
+    """Punching reads a phrase, not rows — the flag would read the wrong thing."""
+    plate = _plate_file(tmp_path, _plate(XOR_12_PARTS[0]))
+    assert main(["tinyseed", "--file", str(plate)]) == 2
+    assert "--file only applies with --reverse" in caplog.text
+
+
+def test_tinyseed_refuses_a_file_and_stdin_together():
+    with pytest.raises(SystemExit):
+        main(["tinyseed", "--reverse", "--stdin", "--file", "plate.txt"])
+
+
 def test_checksum_lists_every_valid_final_word(capsys, monkeypatch):
     _feed(monkeypatch, " ".join(XOR_12_RESULT.split()[:11]))
     assert main(["checksum", "--stdin"]) == 0
@@ -779,6 +856,13 @@ def test_checksum_aborts_cleanly_on_interrupt(capsys, monkeypatch, caplog):
 def _plate(phrase: str, style: str = tinyseed.DEFAULT_STYLE) -> list[str]:
     """The rows a punched plate shows for a phrase, as they are read back off it."""
     return [tinyseed.dots(word, style) for word in phrase.split()]
+
+
+def _plate_file(tmp_path, rows: list[str], name: str = "plate.txt"):
+    """Write rows out the way someone copying a plate down would, and hand back the path."""
+    path = tmp_path / name
+    path.write_text("\n".join(rows), encoding="utf-8")
+    return path
 
 
 def _rows(monkeypatch, *replies: str) -> list[str]:
