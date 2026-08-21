@@ -149,7 +149,7 @@ The same list answers the other question people ask it: *which last word did I h
 Like the other phrase tools, the words are never taken from the command line, and `--stdin` reads the whole of stdin as one phrase, so a backup may wrap however it happens to be written:
 
 ```bash
-seed-tools checksum --stdin < first-23-words.txt
+seed-tools checksum --stdin < examples/first-23-words.txt
 ```
 
 The count on stderr is worth reading. A file that lost or gained a word can still land on an accepted length, and the candidates look exactly as convincing either way — the count is what gives it away. Prompts and errors go to stderr and the candidates to stdout.
@@ -158,7 +158,7 @@ The count on stderr is worth reading. A file that lost or gained a word can stil
 
 ### `tinyseed`
 
-Turn a seed phrase into the punch pattern for a [TinySeed](https://tinyseed.io) plate — a titanium card that stores a backup as drilled holes instead of letters, so it survives fire and water. The plate is punched front and back, 12 words to a side: a 12-word phrase fills the front, a 24-word one carries on over the back. Reading all 24 rows off the printed card by hand is slow and easy to get wrong, and a hole cannot be un-punched. It goes both ways: `--reverse` [reads a punched plate back](#reading-a-plate-back) so you can check what you actually engraved.
+Turn a seed phrase into the punch pattern for a [TinySeed](https://tinyseed.io) plate — a titanium card that stores a backup as drilled holes instead of letters, so it survives fire and water. The plate is punched front and back, 12 words to a side: a 12-word phrase fills the front, a 24-word one carries on over the back. Reading all 24 rows off the printed card by hand is slow and easy to get wrong, and a hole cannot be un-punched. It goes both ways: `--reverse` [reads a punched plate back](#reading-a-plate-back), typed row by row or from a file, so you can check what you actually engraved.
 
 TinySeed numbers the wordlist **1–2048** and punches that number in **12 bits**, most significant bit first. That is deliberately *not* the 11-bit index `lookup` prints: it is that index **plus one**, and only `zoo` (2048) sets the leading bit.
 
@@ -190,7 +190,7 @@ Like `xor`, the phrase is never taken as a command-line argument — that would 
 All of stdin is the phrase, so it may wrap however your backup file happens to be written — two lines of 12, four lines of 6, one word per line. A newline carries no meaning inside a phrase, and reading only the first line would silently punch half a plate:
 
 ```bash
-seed-tools tinyseed --stdin < backup.txt
+seed-tools tinyseed --stdin < examples/backup.txt
 ```
 
 Note this differs from `xor --stdin`, where a newline separates one part from the next.
@@ -248,10 +248,28 @@ So `.##..#...#..` and `011001000100` and `○●●○○●○○○●○○` 
 Unlike every other prompt in this project, **this one echoes what you type** — a transcription you cannot see is not one you can proofread, and the decoded words are printed anyway. `--style` is not accepted here: the marks are recognised however you write them.
 
 ```bash
-seed-tools tinyseed --reverse --stdin < plate.txt
+seed-tools tinyseed --reverse --stdin < examples/plate-24.txt
 ```
 
 Piped like this the file's own end is what stops the read, so a blank line in it is only the gap between the front and the back of the plate and is skipped — write 24 rows as twelve, a gap, and twelve more if that is how you copied them down. (Typed at the prompt there is no end-of-file to wait for, so there a blank line still ends the list.)
+
+`--file` takes the same rows by name instead of on stdin:
+
+```bash
+seed-tools tinyseed --reverse --file examples/plate-24.txt
+```
+
+It reads exactly as the pipe does — end of file ends the list, a blank line in it is the gap between the sides — but nothing is prompted for and nothing is typed, so it works at a terminal without redirection and without `--stdin`. The two are alternatives: pass one or the other, not both. A row that cannot be read still names its row number, so a mistake in the file is easy to find. `--file` applies to `--reverse` only; the punching direction reads a phrase, which comes from a prompt or `--stdin`.
+
+[examples/plate-24.txt](examples/plate-24.txt) is one of several ready-made plates in [examples/](examples/) — one side, both sides, the same words in typeable notation, and one with a hole deliberately in the wrong place so you can watch the checksum refuse it:
+
+```bash
+seed-tools tinyseed --reverse --file examples/plate-24-misread.txt
+```
+
+Every `< file` and `--file` example in this README reads one of those files, so each command runs as written — on published test phrases, never a real one.
+
+> A file of plate rows **is** your seed phrase, written in another notation — anyone who reads it can spend the funds. These tools never create such a file; if you made one to copy a plate down, keep it on the offline machine and delete it when you are done, and remember a deleted file is often still recoverable from the disk.
 
 > Verify before the wallet holds anything. Read the plate you just punched, not the phrase you meant to punch — the point is to catch the difference.
 
@@ -293,7 +311,7 @@ ERROR seed_tools.cli: Part 2: Invalid checksum — check the words and their ord
 Add `--entropy` to also print the combined entropy as hex, which is useful for cross-checking against another implementation.
 
 ```bash
-seed-tools xor --stdin < parts.txt
+seed-tools xor --stdin < examples/parts.txt
 ```
 
 Piped like this the file's own end is what stops the read, so a blank line in it is only the gap between two parts and is skipped — write the parts out spaced apart if that is how you keep them. (Typed at the prompt there is no end-of-file to wait for, so there a blank line still ends the list.) Before the result, the tool reports on stderr what it actually combined:
@@ -379,6 +397,9 @@ pre-commit install
 | `Parts cancel out` | Two parts are identical, or one equals the XOR of the others — the extra parts add no entropy, so use independent ones |
 | `stdin is not a terminal` | A phrase tool was piped or run from a script — pass `--stdin`. `xor` reads one phrase per line; `tinyseed` and `checksum` read the whole of stdin as one phrase, and `tinyseed --reverse` one plate row per line |
 | `stdin is a terminal` | `--stdin` reads a pipe or a file, and typing at a terminal would echo the phrase into scrollback — drop the flag to be prompted with input hidden |
+| `Cannot read <path>` | `--file` could not open that file — check the path, and that it is a file you can read |
+| `<path> is not a text file` | `--file` was pointed at something that is not text — most likely the wrong path, since a plate copied down is plain lines of `○`/`●`, `0`/`1` or `.`/`#` |
+| `--file only applies with --reverse` | `--file` holds rows of holes, which only `--reverse` reads. To punch a plate from a phrase in a file, pipe it in: `seed-tools tinyseed --stdin < examples/backup.txt` |
 | `tinyseed` circles look doubled or misaligned | The terminal renders `●`/`○` at double width (they are East Asian *Ambiguous*) — use `--style binary` |
 | A `tinyseed` number is one higher than `lookup` says | Correct: TinySeed numbers the wordlist 1–2048, `lookup` uses the BIP-39 index 0–2047 |
 | `Row N: Expected 12 positions, got 11` | A hole was missed or double-counted while reading row `N` — every row is exactly 12 positions, so count them again, in groups of three if it helps |

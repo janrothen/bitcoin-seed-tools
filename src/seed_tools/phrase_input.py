@@ -64,6 +64,34 @@ def row_reader() -> Callable[[str], str]:
     return read_line_echoed
 
 
+@contextmanager
+def file_reader(path: str) -> Iterator[Callable[[str], str]]:
+    """Read the entries of a list from a named file, one line per call.
+
+    The same shape as the readers above — prompt in, one line out — but the
+    prompt is dropped: there is nobody at the keyboard to read it. At the end of
+    the file `readline` returns an empty string, which ends a list exactly as
+    the end of a pipe does, so a file reads like `--stdin` and not like typing.
+    """
+    try:
+        with open(path, encoding="utf-8") as handle:
+
+            def read(_prompt: str) -> str:
+                try:
+                    return handle.readline()
+                except UnicodeDecodeError:
+                    # That it is not text, never which bytes: same reasoning as
+                    # the errors in `tinyseed.read_pattern` — this is logged,
+                    # and a file given by mistake could hold anything.
+                    raise ValueError(f"{path} is not a text file") from None
+
+            yield read
+    except OSError as error:
+        # Missing, unreadable, a directory: an input error like any other, and
+        # it names the path and the reason, never a line of what was in it.
+        raise ValueError(f"Cannot read {path}: {error.strerror}") from None
+
+
 def require_interactive_or_stdin(use_stdin: bool, stdin_reads: str) -> None:
     """Refuse to prompt when nobody is there to type, and to read a typed pipe.
 
