@@ -261,7 +261,7 @@ seed-tools tinyseed --reverse --file examples/plate-24.txt
 
 It reads exactly as the pipe does — end of file ends the list, a blank line in it is the gap between the sides — but nothing is prompted for and nothing is typed, so it works at a terminal without redirection and without `--stdin`. The two are alternatives: pass one or the other, not both. A row that cannot be read still names its row number, so a mistake in the file is easy to find. `--file` applies to `--reverse` only; the punching direction reads a phrase, which comes from a prompt or `--stdin`.
 
-[examples/plate-24.txt](examples/plate-24.txt) is one of several ready-made plates in [examples/](examples/) — one side, both sides, the same words in typeable notation, and one with a hole deliberately in the wrong place so you can watch the checksum refuse it:
+[examples/plate-24.txt](examples/plate-24.txt) is one of several ready-made plates in [examples/](examples/) — one side, both sides, the same words in each of the three notations, and one with a hole deliberately in the wrong place so you can watch the checksum refuse it:
 
 ```bash
 seed-tools tinyseed --reverse --file examples/plate-24-misread.txt

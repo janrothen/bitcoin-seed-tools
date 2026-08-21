@@ -28,6 +28,7 @@ def _piped(monkeypatch, name: str) -> None:
     ("name", "phrase"),
     [
         ("plate-12.txt", XOR_12_RESULT),
+        ("plate-12-binary.txt", XOR_12_RESULT),
         ("plate-12-typed.txt", XOR_12_RESULT),
         ("plate-24.txt", XOR_24_RESULT),
     ],
@@ -95,6 +96,7 @@ def test_every_example_file_is_covered_by_a_test():
         "backup.txt",
         "first-23-words.txt",
         "parts.txt",
+        "plate-12-binary.txt",
         "plate-12-typed.txt",
         "plate-12.txt",
         "plate-24-misread.txt",
