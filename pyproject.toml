@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "bitcoin-seed-tools"
-version = "0.3.0"
+version = "0.4.0"
 description = "Local command-line tools for working with BIP-39 seed phrases."
 requires-python = ">=3.13"
 dependencies = []
