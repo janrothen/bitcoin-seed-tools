@@ -14,13 +14,14 @@ src/seed_tools/
     __main__.py          # entry point: python -m seed_tools
     cli.py               # argparse setup, subcommand dispatch, error handling
     config.py            # tomllib config loader
-    wordlist.py          # Wordlist: word ↔ index ↔ 11-bit binary
+    wordlist.py          # Wordlist: word ↔ index ↔ 11-bit binary, 4-letter prefixes
     mnemonic.py          # BIP-39 phrases: entropy ↔ words, checksum, XOR
     tinyseed.py          # TinySeed plates: word ↔ 12-bit punch pattern
     phrase_input.py      # prompting for a phrase without echoing it
     tools/
         __init__.py      # TOOLS registry — add new tool modules here
         checksum.py      # `checksum` subcommand
+        expand.py        # `expand` subcommand
         lookup.py        # `lookup` subcommand
         tinyseed.py      # `tinyseed` subcommand
         xor.py           # `xor` subcommand
@@ -91,8 +92,8 @@ Register it in `TOOLS` in `tools/__init__.py`. `cli.py` stays untouched.
 - Pick the reader by how many phrases the tool takes. One phrase (`tinyseed`,
   `checksum`): `phrase_reader`, which consumes all of stdin — a newline is ordinary
   whitespace inside a phrase, and reading one line would silently drop the rest
-  of a wrapped backup. Several phrases (`xor`): `line_reader`, where a newline
-  separates entries. Each tool passes its own `STDIN_READS` to
+  of a wrapped backup. Several entries (`xor`, `expand`): `line_reader`, where a
+  newline separates them. Each tool passes its own `STDIN_READS` to
   `require_interactive_or_stdin` so the error describes that tool's format.
 - Any tool reading a *list* of entries ends it the same way, and what ends it
   depends on where it comes from. Read from something with an end — a pipe, or a
@@ -102,8 +103,9 @@ Register it in `TOOLS` in `tools/__init__.py`. `cli.py` stays untouched.
   list. Pass the reader in (`tinyseed._read_rows`) rather than picking it inside
   the loop, so a third source is a new reader and not a new branch. Getting this wrong does not raise: a truncated list
   of parts or rows re-checksums into a plausible phrase that is not the one the
-  input described. `xor._read_parts` and `tinyseed._read_rows` both do it this
-  way; copy that shape rather than inventing a third.
+  input described. `xor._read_parts`, `expand._read_entries` and
+  `tinyseed._read_rows` all do it this way; copy that shape rather than
+  inventing a third.
 - Hidden input has exactly one exception, `row_reader` (`tinyseed --reverse`):
   what is typed there is holes being checked against the plate in the reader's
   hand, and a transcription that cannot be seen cannot be proofread. Do not copy
@@ -112,6 +114,10 @@ Register it in `TOOLS` in `tools/__init__.py`. `cli.py` stays untouched.
   and pinned by a test — regenerate it, never hand-edit it.
 
 ## Security
+- A word is as secret as the phrase it belongs to, and so are the first four
+  letters of one: they name it uniquely, which is the whole premise of `expand`.
+  Errors and log lines name the position, never the letters — `Wordlist.index`,
+  `tinyseed.read_pattern` and `expand._letters` all do this.
 - Never write a seed phrase to disk, log it, or send it anywhere. The tools make
   no network calls; keep it that way.
 - Never commit test vectors that look like real seed phrases.

@@ -38,12 +38,14 @@ Words for the tools that read a phrase, all of them piped in with `--stdin`.
 | --- | --- | --- |
 | [backup.txt](backup.txt) | `tinyseed --stdin` | 24 words wrapped four to a line, as a backup is usually written. Prints the punch pattern for all 24 — a newline means nothing inside a phrase, so the wrapping does not split it |
 | [first-23-words.txt](first-23-words.txt) | `checksum --stdin` | The same phrase without its last word. Lists the 8 words that complete it, one of which is `indoor` |
+| [pills.txt](pills.txt) | `expand --stdin` | The same phrase as a bag of SeedPills shows it: the first four letters of each word, one per line. Expands back to all 24 words, because four letters identify a BIP-39 word uniquely |
 | [parts.txt](parts.txt) | `xor --stdin` | The three published Coldcard parts, one per line with a blank line between them. Combines to the phrase in `backup.txt` — piped, the blank lines are gaps and are skipped |
 
 ```bash
 seed-tools tinyseed --stdin < examples/backup.txt
 seed-tools checksum --stdin < examples/first-23-words.txt
 seed-tools xor --stdin < examples/parts.txt
+seed-tools expand --stdin < examples/pills.txt
 ```
 
 `xor` prints a `Part N:` prompt before every line it reads, so a file with gaps
@@ -62,7 +64,7 @@ They are the two published Coldcard Seed XOR worked examples, the same ones
 [tests/vectors.py](../tests/vectors.py) uses:
 
 - `plate-12.txt`, `plate-12-binary.txt`, `plate-12-typed.txt` — `cannon opinion leader nephew found yard metal galaxy crouch between real trade`
-- `plate-24.txt`, `backup.txt`, `parts.txt` — `silent toe meat possible chair blossom wait occur this worth option bag nurse find fish scene bench asthma bike wage world quit primary indoor`
+- `plate-24.txt`, `backup.txt`, `parts.txt`, `pills.txt` — `silent toe meat possible chair blossom wait occur this worth option bag nurse find fish scene bench asthma bike wage world quit primary indoor`
 
 **These phrases are public.** They have been published, indexed and swept for
 years; never send funds to them. They are here so a manual test needs no real
