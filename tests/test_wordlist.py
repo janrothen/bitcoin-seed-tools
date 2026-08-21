@@ -3,7 +3,7 @@ import hashlib
 import pytest
 
 from seed_tools.config import asset, config
-from seed_tools.wordlist import WORDLIST_SIZE, Wordlist
+from seed_tools.wordlist import UNIQUE_PREFIX, WORDLIST_SIZE, Wordlist
 
 # The published BIP-39 English wordlist. Pinned because every other check in
 # this file passes just as happily against a wrong list: nothing here can tell
@@ -88,3 +88,43 @@ def test_shipped_wordlist_is_the_published_one():
         asset(config()["wordlist"]["file"]).read_bytes()
     ).hexdigest()
     assert digest == BIP39_ENGLISH_SHA256
+
+
+def test_the_first_four_letters_identify_a_word(words):
+    """What lets a backup print four letters and stop — checked, not assumed.
+
+    `expand` rests on this: four letters off a pill or a stamped plate come back
+    as exactly one word. If a wordlist were ever swapped for one without the
+    property, every truncated backup made against it would be ambiguous.
+    """
+    entries = _entries(words)
+    prefixes = {word[:UNIQUE_PREFIX] for word in entries}
+    assert len(prefixes) == len(entries)
+
+
+def test_every_long_word_is_recovered_from_its_first_four_letters(words):
+    """The round trip a truncated backup makes, for all 2048 words at once."""
+    for word in _entries(words):
+        if len(word) >= UNIQUE_PREFIX:
+            assert words.starting_with(word[:UNIQUE_PREFIX]) == [word]
+
+
+def test_a_short_word_prints_whole_and_sorts_ahead_of_what_it_starts(words):
+    """Why a three-letter print is not ambiguous the way three letters are.
+
+    A word shorter than four letters is printed in full, so the letters *are*
+    the word — even though longer words begin with them. Sorted, the word itself
+    comes first, which is what `expand` says out loud when `--pick` is used.
+    """
+    for word in _entries(words):
+        if len(word) < UNIQUE_PREFIX:
+            assert words.starting_with(word)[0] == word
+
+
+def test_shortest_word_is_measured_from_the_list(words):
+    assert words.shortest_word() == min(len(word) for word in _entries(words))
+
+
+def test_shortest_english_word_is_three_letters(words):
+    """The floor `expand` enforces: fewer letters is a word missing letters."""
+    assert words.shortest_word() == 3

@@ -6,6 +6,12 @@ from seed_tools.config import asset, config
 WORDLIST_SIZE = 2048
 INDEX_BITS = 11
 
+# BIP-39 chose its wordlists so that the first four letters identify a word
+# uniquely, which is why backups that cannot fit a whole word — SeedPills, a
+# stamped plate, a cramped column on paper — print four letters and stop. A test
+# checks this against the shipped list rather than trusting the specification.
+UNIQUE_PREFIX = 4
+
 
 class Wordlist:
     """The BIP-39 wordlist: word ↔ index ↔ 11-bit binary."""
@@ -27,6 +33,7 @@ class Wordlist:
             raise ValueError("Wordlist is not in sorted order")
         self._words = words
         self._indices = {word: index for index, word in enumerate(words)}
+        self._shortest = min(len(word) for word in words)
 
     @classmethod
     def from_file(cls, path: Path) -> "Wordlist":
@@ -66,6 +73,15 @@ class Wordlist:
 
     def starting_with(self, prefix: str) -> list[str]:
         return [word for word in self._words if word.startswith(prefix)]
+
+    def shortest_word(self) -> int:
+        """The length of the shortest word in the list — 3 in English.
+
+        The floor on a truncated word: fewer letters than this is not a word cut
+        short, it is a word missing letters nobody wrote down. Measured rather
+        than assumed, because it is a property of whichever list is configured.
+        """
+        return self._shortest
 
 
 @cache

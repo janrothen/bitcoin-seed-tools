@@ -49,6 +49,7 @@ src/seed_tools/
     phrase_input.py      # reading a phrase from a terminal without echoing it
     tools/
         checksum.py      # `checksum` subcommand
+        expand.py        # `expand` subcommand
         lookup.py        # `lookup` subcommand
         tinyseed.py      # `tinyseed` subcommand
         xor.py           # `xor` subcommand
@@ -111,6 +112,58 @@ seed-tools lookup abandon 42 zeb
 ```
 
 Unknown terms print `no match`; like `grep`, the command exits with status `1` only when no term matched at all. Terms are matched lowercase, the way BIP-39 words are written.
+
+### `expand`
+
+Complete BIP-39 words from the first few letters of each one. A backup that cannot fit a whole word prints four letters and stops — a SeedPills pill, a stamped plate, a cramped column on paper — because BIP-39 chose its wordlists so that **the first four letters identify a word uniquely**. This turns those letters back into words.
+
+```bash
+seed-tools expand
+```
+
+It asks for one set of letters at a time, without echoing them, and a blank line ends the list:
+
+```
+Letters 1:
+Letters 2 (blank to finish):
+Letters 3 (blank to finish):
+ 1  sile  silent
+ 2  toe   toe
+
+silent toe
+```
+
+Four letters always come back as exactly one word. Fewer than four may match several, and then every match is printed:
+
+```
+ 1  abs   absent absorb abstract absurd
+```
+
+The letters must be between **3 and 4** — 3 because no BIP-39 word is shorter (the minimum is measured from the wordlist, not assumed), and 4 because that is all a truncated backup prints. For a longer prefix, or to look a word up by index, use [`lookup`](#lookup).
+
+A print of fewer than four letters is a whole short word, not a word cut off: a pill reading `act` is `act`, because `action` would have printed `acti`. Such a word is listed first, ahead of the longer words it starts.
+
+The last line is the phrase, printed only when every set of letters came down to a single word — feed it to [`checksum`](#checksum) to work out a final word if you are generating a seed rather than reading one back.
+
+#### Picking a word when several match
+
+```bash
+seed-tools expand --pick
+```
+
+`--pick` chooses one of the matches at random, using `secrets` rather than `random` — whatever it picks becomes a word of a seed phrase, so it has to be as unguessable as the draw it stands in for. It says on stderr how many it chose from.
+
+> `--pick` is right when you are **drawing pills at random to make a new seed**, and wrong when you are **reading a backup you already have**. Reading a backup, the word is whichever one is really printed, and a neighbour of it is somebody else's wallet. The output looks identical either way, which is why the flag is opt-in.
+
+Drawing at random and then picking at random does not skew the result: each pill in the bag is equally likely, and the words that share a set of letters are exactly as many as the pills that show it, so every one of the 2048 words stays equally likely.
+
+Like the other phrase tools, the letters are never taken as a command-line argument — that would leave a word of your seed in your shell history. Pass `--stdin` to pipe them in, one set per line:
+
+```bash
+seed-tools expand --stdin < examples/pills.txt
+```
+
+Piped, a blank line is a gap in the file and is skipped; the end of the input is what ends the list. Typed, a blank line ends it. Letters that no word starts with are refused, naming the position and never the letters themselves.
 
 ### `checksum`
 
@@ -374,7 +427,7 @@ pre-commit install
 - Never share a seed phrase, and never share the output of these tools. A phrase is not a password you can rotate — whoever holds it holds the funds, immediately and irreversibly. Nobody legitimate ever needs it: not a wallet vendor, not an exchange, not a support agent, not a bug report, and not whoever answers you on X, Discord, Telegram or Reddit. Anyone asking for it is stealing from you.
 - The tools never write a seed phrase to disk and never make network calls — but your shell does keep a history file. Clear it (or prefix commands with a space) after working with real words.
 - Never commit anything containing a real seed phrase. Nothing scans for that automatically — treat every test vector you add as public. The phrases in [tests/vectors.py](tests/vectors.py) are published specification vectors and are already compromised.
-- `xor`, `tinyseed` and `checksum` never echo a phrase you type and never write it anywhere. The one exception is `tinyseed --reverse`, which echoes the rows of holes on purpose so you can proofread them — it is still a secret on your screen, so read a plate back somewhere nobody is looking. Either way, **Python cannot reliably wipe a phrase from process memory** — strings are immutable and may be copied by the interpreter or paged to swap. Treat the machine as contaminated afterwards: use an offline system and power it off when you are done.
+- `xor`, `tinyseed`, `checksum` and `expand` never echo what you type and never write it anywhere. Four letters name one BIP-39 word, so a pill's print is treated as a word of a seed, not as a hint. The one exception is `tinyseed --reverse`, which echoes the rows of holes on purpose so you can proofread them — it is still a secret on your screen, so read a plate back somewhere nobody is looking. Either way, **Python cannot reliably wipe a phrase from process memory** — strings are immutable and may be copied by the interpreter or paged to swap. Treat the machine as contaminated afterwards: use an offline system and power it off when you are done.
 - Seed XOR has two uses with opposite backup rules — see [`xor`](#xor) before you throw anything away. If you are *splitting* a seed, every part is required forever, none of them may sit beside the combined phrase, and it is all-of-n rather than a threshold scheme. If you combined parts only to *generate* a seed that you then back up in full, the parts are scratch work and destroying them is the right move — but verify the backup first, because it becomes the only copy.
 
 ## Troubleshooting
@@ -395,7 +448,12 @@ pre-commit install
 | `All parts must have the same word count` | Mixing a 12-word and a 24-word part — `xor` needs them the same length |
 | `Need at least 2 parts to XOR` | The list was ended with a blank line too early; enter at least two phrases |
 | `Parts cancel out` | Two parts are identical, or one equals the XOR of the others — the extra parts add no entropy, so use independent ones |
-| `stdin is not a terminal` | A phrase tool was piped or run from a script — pass `--stdin`. `xor` reads one phrase per line; `tinyseed` and `checksum` read the whole of stdin as one phrase, and `tinyseed --reverse` one plate row per line |
+| `Letters N: at least 3 are needed` | Set `N` was entered with fewer letters than the shortest BIP-39 word, so some were missed — read the print again |
+| `Letters N: at most 4` | Set `N` had more than four letters. Four is all a truncated backup shows; for a longer prefix or a whole word, use [`lookup`](#lookup) |
+| `Letters N: no BIP-39 word starts with them` | Set `N` is not the beginning of any word — a letter is misread, or two prints ran together. The letters are deliberately not repeated back, since errors reach a log |
+| `No letters were entered` | The list was ended before the first set; there was nothing to expand |
+| `expand` prints no phrase on the last line | At least one set still matches several words, so there is no single phrase — take the word your backup shows, or pass `--pick` if you are drawing pills at random |
+| `stdin is not a terminal` | A phrase tool was piped or run from a script — pass `--stdin`. `xor` reads one phrase per line; `expand` one set of letters per line; `tinyseed` and `checksum` read the whole of stdin as one phrase, and `tinyseed --reverse` one plate row per line |
 | `stdin is a terminal` | `--stdin` reads a pipe or a file, and typing at a terminal would echo the phrase into scrollback — drop the flag to be prompted with input hidden |
 | `Cannot read <path>` | `--file` could not open that file — check the path, and that it is a file you can read |
 | `<path> is not a text file` | `--file` was pointed at something that is not text — most likely the wrong path, since a plate copied down is plain lines of `○`/`●`, `0`/`1` or `.`/`#` |

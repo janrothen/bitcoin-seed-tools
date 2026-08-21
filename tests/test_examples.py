@@ -80,6 +80,13 @@ def test_the_23_word_example_is_completed_by_the_backup_phrase(capsys, monkeypat
     assert XOR_24_RESULT.split()[-1] in candidates
 
 
+def test_the_pills_example_expands_to_the_phrase_it_documents(capsys, monkeypatch):
+    """Four letters a pill can print, back to the whole word, 24 times over."""
+    _piped(monkeypatch, "pills.txt")
+    assert main(["expand", "--stdin"]) == 0
+    assert capsys.readouterr().out.splitlines()[-1] == XOR_24_RESULT
+
+
 def test_the_readme_only_points_at_files_that_exist():
     """Every command in the README runs as written, or it teaches a broken one."""
     readme = (EXAMPLES.parent / "README.md").read_text(encoding="utf-8")
@@ -96,6 +103,7 @@ def test_every_example_file_is_covered_by_a_test():
         "backup.txt",
         "first-23-words.txt",
         "parts.txt",
+        "pills.txt",
         "plate-12-binary.txt",
         "plate-12-typed.txt",
         "plate-12.txt",

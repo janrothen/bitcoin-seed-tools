@@ -853,6 +853,185 @@ def test_checksum_aborts_cleanly_on_interrupt(capsys, monkeypatch, caplog):
     assert capsys.readouterr().out == ""
 
 
+def test_expand_completes_a_four_letter_print(capsys, monkeypatch):
+    """Four letters identify a word, so this is the whole job most of the time."""
+    _feed(monkeypatch, "abso")
+    assert main(["expand", "--stdin"]) == 0
+    assert capsys.readouterr().out.splitlines()[0].split()[1:] == ["abso", "absorb"]
+
+
+def test_expand_lists_every_word_when_the_letters_are_short(capsys, monkeypatch):
+    _feed(monkeypatch, "abs")
+    assert main(["expand", "--stdin"]) == 0
+    line = capsys.readouterr().out.splitlines()[0]
+    assert line.split()[2:] == ["absent", "absorb", "abstract", "absurd"]
+
+
+def test_expand_reads_a_whole_bag_of_pills_back(capsys, monkeypatch):
+    """The point of the tool: 24 prints of four letters, one phrase out."""
+    _feed(monkeypatch, *(word[:4] for word in XOR_24_RESULT.split()))
+    assert main(["expand", "--stdin"]) == 0
+    assert capsys.readouterr().out.splitlines()[-1] == XOR_24_RESULT
+
+
+def test_expand_prints_no_phrase_while_anything_is_ambiguous(capsys, monkeypatch):
+    """Half a decision is not a phrase — printing one would invent the rest."""
+    _feed(monkeypatch, "abso", "abs")
+    assert main(["expand", "--stdin"]) == 0
+    out = capsys.readouterr()
+    assert "1 of 2 sets match more than one word" in out.err
+    assert not out.out.splitlines()[-1].startswith("absorb")
+
+
+def test_expand_reports_how_many_sets_it_read(capsys, monkeypatch):
+    """A file that lost an entry still expands cleanly; the count is the tell."""
+    _feed(monkeypatch, "abso", "acti")
+    assert main(["expand", "--stdin"]) == 0
+    assert "2 sets of letters read." in capsys.readouterr().err
+
+
+def test_expand_pick_settles_on_one_word_per_set(capsys, monkeypatch):
+    _feed(monkeypatch, "abs", "act")
+    assert main(["expand", "--stdin", "--pick"]) == 0
+    out = capsys.readouterr()
+    picked = out.out.splitlines()[-1].split()
+    assert len(picked) == 2
+    assert picked[0] in ["absent", "absorb", "abstract", "absurd"]
+    assert "picked 1 of 4 at random" in out.err
+
+
+def test_expand_pick_draws_from_secrets_not_random(capsys, monkeypatch):
+    """What this picks becomes a word of a seed, so it needs the good source."""
+    drawn: list[list[str]] = []
+
+    def choice(matches: list[str]) -> str:
+        drawn.append(matches)
+        return matches[0]
+
+    monkeypatch.setattr("secrets.choice", choice)
+    _feed(monkeypatch, "abs")
+    assert main(["expand", "--stdin", "--pick"]) == 0
+    assert drawn == [["absent", "absorb", "abstract", "absurd"]]
+    assert capsys.readouterr().out.splitlines()[-1] == "absent"
+
+
+def test_expand_pick_says_when_the_letters_are_a_word_themselves(capsys, monkeypatch):
+    """A pill printing three letters shows a three-letter word, not a prefix."""
+    _feed(monkeypatch, "act")
+    assert main(["expand", "--stdin", "--pick"]) == 0
+    assert "themselves a word" in capsys.readouterr().err
+
+
+def test_expand_pick_is_silent_when_nothing_is_ambiguous(capsys, monkeypatch):
+    _feed(monkeypatch, "abso")
+    assert main(["expand", "--stdin", "--pick"]) == 0
+    assert "picked" not in capsys.readouterr().err
+
+
+def test_expand_pick_warns_that_it_is_a_draw(capsys, monkeypatch):
+    """Right for making a seed, wrong for reading one back — and it looks alike."""
+    _feed(monkeypatch, "abso")
+    assert main(["expand", "--stdin", "--pick"]) == 0
+    assert "--pick chooses at random" in capsys.readouterr().err
+
+
+def test_expand_rejects_fewer_letters_than_the_shortest_word(monkeypatch, caplog):
+    _feed(monkeypatch, "ab")
+    assert main(["expand", "--stdin"]) == 2
+    assert "Letters 1: at least 3" in caplog.text
+
+
+def test_expand_rejects_more_letters_than_a_truncated_backup_shows(monkeypatch, caplog):
+    _feed(monkeypatch, "absor")
+    assert main(["expand", "--stdin"]) == 2
+    assert "Letters 1: at most 4" in caplog.text
+
+
+def test_expand_rejects_letters_no_word_starts_with(monkeypatch, caplog):
+    _feed(monkeypatch, "abso", "qqq")
+    assert main(["expand", "--stdin"]) == 2
+    assert "Letters 2: no BIP-39 word starts with them" in caplog.text
+
+
+def test_expand_never_repeats_the_letters_in_an_error(monkeypatch, caplog):
+    """Four letters name one word, and errors are logged — same rule as lookup."""
+    _feed(monkeypatch, "zebr")
+    # Accepted, then made to fail on the next entry, so the log covers a run
+    # where real letters were read.
+    _feed(monkeypatch, "zebr", "qqq")
+    assert main(["expand", "--stdin"]) == 2
+    assert "zebr" not in caplog.text
+
+
+def test_expand_rejects_an_empty_list(monkeypatch, caplog):
+    _feed(monkeypatch, "")
+    assert main(["expand", "--stdin"]) == 2
+    assert "No letters were entered" in caplog.text
+
+
+def test_expand_accepts_letters_typed_uppercase(capsys, monkeypatch):
+    _feed(monkeypatch, "ABSO")
+    assert main(["expand", "--stdin"]) == 0
+    assert capsys.readouterr().out.splitlines()[-1] == "absorb"
+
+
+def test_expand_skips_a_gap_in_a_piped_list(capsys, monkeypatch):
+    """Piped, only the end of the input ends the list — a blank line is a gap."""
+    _feed(monkeypatch, "abso", "", "acti")
+    assert main(["expand", "--stdin"]) == 0
+    assert capsys.readouterr().out.splitlines()[-1] == "absorb action"
+
+
+def test_expand_ends_a_typed_list_at_a_blank_line(capsys, monkeypatch):
+    """Typed, a blank line is the only way to say "that was the last pill"."""
+    _prompts(monkeypatch, "abso", "acti", "", "zebr")
+    assert main(["expand"]) == 0
+    assert capsys.readouterr().out.splitlines()[-1] == "absorb action"
+
+
+def test_expand_ends_a_typed_list_at_a_line_of_spaces(capsys, monkeypatch):
+    """A blank line is blank however it was made — `getpass` keeps the spaces."""
+    _prompts(monkeypatch, "abso", "   ", "zebr")
+    assert main(["expand"]) == 0
+    assert capsys.readouterr().out.splitlines()[-1] == "absorb"
+
+
+def test_expand_prompts_without_echo_on_a_terminal(capsys, monkeypatch):
+    """Letters off a pill are a word of a seed, so they are typed hidden."""
+    monkeypatch.setattr("seed_tools.phrase_input.stdin_is_tty", lambda: True)
+    monkeypatch.setattr(
+        "seed_tools.phrase_input.read_line_echoed", _raise(AssertionError)
+    )
+    prompts = _prompts(monkeypatch, "abso", "")
+    assert main(["expand"]) == 0
+    assert prompts[0] == "Letters 1: "
+    # From the second on, ending the list is a real choice, so the prompt says how.
+    assert prompts[1] == "Letters 2 (blank to finish): "
+    assert capsys.readouterr().out.splitlines()[-1] == "absorb"
+
+
+def test_expand_refuses_a_non_terminal_without_the_stdin_flag(monkeypatch, caplog):
+    monkeypatch.setattr("seed_tools.phrase_input.stdin_is_tty", lambda: False)
+    assert main(["expand"]) == 2
+    assert "one set of letters per line" in caplog.text
+
+
+def test_expand_refuses_the_stdin_flag_at_a_terminal(monkeypatch, caplog):
+    monkeypatch.setattr("seed_tools.phrase_input.stdin_is_tty", lambda: True)
+    assert main(["expand", "--stdin"]) == 2
+    assert "stdin is a terminal" in caplog.text
+
+
+def test_expand_aborts_cleanly_on_end_of_input(capsys, monkeypatch, caplog):
+    monkeypatch.setattr("seed_tools.phrase_input.stdin_is_tty", lambda: True)
+    monkeypatch.setattr(
+        "seed_tools.phrase_input.read_line_hidden", _raise(KeyboardInterrupt)
+    )
+    assert main(["expand"]) == 2
+    assert "Aborted" in caplog.text
+    assert capsys.readouterr().out == ""
+
+
 def _plate(phrase: str, style: str = tinyseed.DEFAULT_STYLE) -> list[str]:
     """The rows a punched plate shows for a phrase, as they are read back off it."""
     return [tinyseed.dots(word, style) for word in phrase.split()]
