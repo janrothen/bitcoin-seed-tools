@@ -14,9 +14,14 @@ Rows of holes for `tinyseed --reverse`, which reads a punched plate back.
 | File | What it is | What it does |
 | --- | --- | --- |
 | [plate-12.txt](plate-12.txt) | One side of a plate, 12 rows of `○`/`●`, exactly as they come off the metal | Prints the 12 words below, exit `0` |
+| [plate-12-binary.txt](plate-12-binary.txt) | The same twelve words as `0`/`1` — what `tinyseed --style binary` prints, fed straight back in | Prints the same 12 words |
 | [plate-12-typed.txt](plate-12-typed.txt) | The same twelve words written the way a keyboard can type them: `.`/`#`, grouped in threes | Prints the same 12 words — the notation is not part of the meaning |
 | [plate-24.txt](plate-24.txt) | Both sides, written as twelve rows, a blank line, twelve more — how a 24-word plate is usually copied down | Prints all 24 words: read from a file, the blank line is the gap where the plate is turned over, not the end |
 | [plate-24-misread.txt](plate-24-misread.txt) | `plate-24.txt` with a single hole moved in row 7 | `Invalid checksum`, exit `2`, nothing printed — the mistake this subcommand exists to catch |
+
+All three notations for one side are here on purpose: `○`/`●` is what a plate
+looks like, `0`/`1` is what `--style binary` prints, and `.`/`#` is what a
+keyboard can type. They read back to the same twelve words, which is the point.
 
 Either source works, and they read the same rows the same way:
 
@@ -56,7 +61,7 @@ and read the plate back to get the same words again — which is what
 They are the two published Coldcard Seed XOR worked examples, the same ones
 [tests/vectors.py](../tests/vectors.py) uses:
 
-- `plate-12.txt`, `plate-12-typed.txt` — `cannon opinion leader nephew found yard metal galaxy crouch between real trade`
+- `plate-12.txt`, `plate-12-binary.txt`, `plate-12-typed.txt` — `cannon opinion leader nephew found yard metal galaxy crouch between real trade`
 - `plate-24.txt`, `backup.txt`, `parts.txt` — `silent toe meat possible chair blossom wait occur this worth option bag nurse find fish scene bench asthma bike wage world quit primary indoor`
 
 **These phrases are public.** They have been published, indexed and swept for
