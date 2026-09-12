@@ -702,6 +702,14 @@ def test_tinyseed_reverse_reads_a_file_at_a_terminal(capsys, monkeypatch, tmp_pa
     assert "Row 1: " not in out.err
 
 
+def test_tinyseed_reverse_reads_a_file_saved_with_a_byte_order_mark(capsys, tmp_path):
+    """Some editors write a BOM ahead of ○/●; it is not a thirteenth mark."""
+    plate = tmp_path / "plate.txt"
+    plate.write_bytes(b"\xef\xbb\xbf" + "\n".join(_plate(XOR_12_PARTS[0])).encode())
+    assert main(["tinyseed", "--reverse", "--file", str(plate)]) == 0
+    assert capsys.readouterr().out.splitlines()[-1] == XOR_12_PARTS[0]
+
+
 def test_tinyseed_reverse_says_which_row_of_a_file_it_could_not_read(tmp_path, caplog):
     rows = _plate(XOR_12_PARTS[0])
     rows[2] = rows[2][:-1]
@@ -915,11 +923,50 @@ def test_expand_pick_draws_from_secrets_not_random(capsys, monkeypatch):
     assert capsys.readouterr().out.splitlines()[-1] == "absent"
 
 
-def test_expand_pick_says_when_the_letters_are_a_word_themselves(capsys, monkeypatch):
-    """A pill printing three letters shows a three-letter word, not a prefix."""
+def test_expand_pick_takes_the_letters_when_they_are_a_word_themselves(
+    capsys, monkeypatch
+):
+    """A pill printing three letters shows a three-letter word, not a prefix.
+
+    Only one pill in the bag prints `act` — `action` prints `acti` — so a draw
+    here would hand most of that pill's chance to the longer words and no word
+    would be equally likely any more. The word is taken, and the draw skipped.
+    """
+    monkeypatch.setattr("secrets.choice", _raise(AssertionError))
     _feed(monkeypatch, "act")
     assert main(["expand", "--stdin", "--pick"]) == 0
-    assert "themselves a word" in capsys.readouterr().err
+    out = capsys.readouterr()
+    assert out.out.splitlines()[-1] == "act"
+    assert "themselves a word" in out.err
+    assert "picked" not in out.err
+
+
+def test_expand_pick_keeps_every_word_equally_likely(words):
+    """The uniformity claim in the README, computed rather than argued.
+
+    Draw a pill uniformly, enter what it prints, and let --pick resolve it: the
+    exact-word rule keeps short words at their 1/2048 share, and the draw over a
+    partial print keeps the rest there, because the pills whose prints start
+    with the letters are exactly the words that do.
+    """
+    from fractions import Fraction
+
+    from seed_tools.wordlist import UNIQUE_PREFIX
+
+    share = {words.word(index): Fraction(0) for index in range(len(words))}
+    for word in list(share):
+        printed = word[:UNIQUE_PREFIX]
+        matches = [word] if words.contains(printed) else words.starting_with(printed)
+        for match in matches:
+            share[match] += Fraction(1, len(words)) / len(matches)
+    assert set(share.values()) == {Fraction(1, len(words))}
+
+
+def test_expand_treats_whitespace_inside_the_letters_as_grouping(capsys, monkeypatch):
+    """A stray space is not a fifth letter — same rule as a plate row."""
+    _feed(monkeypatch, "abs o")
+    assert main(["expand", "--stdin"]) == 0
+    assert capsys.readouterr().out.splitlines()[-1] == "absorb"
 
 
 def test_expand_pick_is_silent_when_nothing_is_ambiguous(capsys, monkeypatch):

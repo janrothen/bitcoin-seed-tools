@@ -74,7 +74,9 @@ def file_reader(path: str) -> Iterator[Callable[[str], str]]:
     the end of a pipe does, so a file reads like `--stdin` and not like typing.
     """
     try:
-        with open(path, encoding="utf-8") as handle:
+        # utf-8-sig, not utf-8: an editor that writes a byte-order mark ahead of
+        # a file of ○/● would otherwise hand the first row a thirteenth mark.
+        with open(path, encoding="utf-8-sig") as handle:
 
             def read(_prompt: str) -> str:
                 try:
