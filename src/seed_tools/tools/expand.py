@@ -29,12 +29,12 @@ PICK_NOTICE = (
     "the word is whichever one is really on the pill, not one of its neighbours."
 )
 
-# Said when the letters entered are themselves a word. Positions, never the
-# letters: this goes out beside errors that are logged.
+# Said when --pick meets letters that are themselves a word. Positions, never
+# the letters: this goes out beside errors that are logged.
 EXACT_NOTICE = (
-    "these letters are themselves a word — a backup that prints fewer than "
-    f"{UNIQUE_PREFIX} letters is showing a whole short word, so that is the one "
-    "to take rather than a longer word it happens to start"
+    "these letters are themselves a word, so that is the one taken — a backup "
+    f"that prints fewer than {UNIQUE_PREFIX} letters is showing a whole short "
+    "word, not the start of a longer one"
 )
 
 
@@ -73,16 +73,25 @@ def run(args: Namespace) -> int:
     for number, (letters, matches) in enumerate(entries, start=1):
         if len(matches) > 1 and args.pick:
             if words.contains(letters):
+                # Not a draw. A print shorter than the unique prefix is a whole
+                # word — `action` would have printed `acti` — so the pill that
+                # shows `act` is the one pill that says `act`. Drawing here
+                # would hand most of that pill's chance to the longer words,
+                # and no word would be equally likely any more.
                 print(f"Letters {number}: {EXACT_NOTICE}.", file=sys.stderr)
-            print(
-                f"Letters {number}: picked 1 of {len(matches)} at random.",
-                file=sys.stderr,
-            )
-            # `secrets`, not `random`: whatever this picks becomes a word of a
-            # seed phrase, so it has to be as unguessable as the draw it stands
-            # in for. Drawn from a bag at random and then picked from at random,
-            # every word of the list stays equally likely.
-            matches = [secrets.choice(matches)]
+                matches = [letters]
+            else:
+                print(
+                    f"Letters {number}: picked 1 of {len(matches)} at random.",
+                    file=sys.stderr,
+                )
+                # `secrets`, not `random`: whatever this picks becomes a word
+                # of a seed phrase, so it has to be as unguessable as the draw
+                # it stands in for. The pills whose prints start with these
+                # letters are exactly the words that do, so a pill drawn at
+                # random and then picked from at random leaves every word
+                # equally likely.
+                matches = [secrets.choice(matches)]
         if len(matches) == 1:
             chosen.append(matches[0])
         print(f"{number:2d}  {letters:<{UNIQUE_PREFIX}}  {' '.join(matches)}")
@@ -144,7 +153,9 @@ def _letters(words: Wordlist, line: str, number: int) -> str:
     log through `cli.main`, and a few letters of a seed word narrow that word to
     a handful of candidates — the same reasoning as `Wordlist.index`.
     """
-    letters = line.strip().lower()
+    # Whitespace is grouping, not content, as it is for a plate row: a stray
+    # space inside four letters must not count as a fifth.
+    letters = "".join(line.split()).lower()
     shortest = words.shortest_word()
     if len(letters) < shortest:
         raise ValueError(

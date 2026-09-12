@@ -141,7 +141,7 @@ Four letters always come back as exactly one word. Fewer than four may match sev
 
 The letters must be between **3 and 4** — 3 because no BIP-39 word is shorter (the minimum is measured from the wordlist, not assumed), and 4 because that is all a truncated backup prints. For a longer prefix, or to look a word up by index, use [`lookup`](#lookup).
 
-A print of fewer than four letters is a whole short word, not a word cut off: a pill reading `act` is `act`, because `action` would have printed `acti`. Such a word is listed first, ahead of the longer words it starts.
+A print of fewer than four letters is a whole short word, not a word cut off: a pill reading `act` is `act`, because `action` would have printed `acti`. Such a word is listed first, ahead of the longer words it starts, and `--pick` takes it rather than drawing.
 
 The last line is the phrase, printed only when every set of letters came down to a single word — feed it to [`checksum`](#checksum) to work out a final word if you are generating a seed rather than reading one back.
 
@@ -155,7 +155,7 @@ seed-tools expand --pick
 
 > `--pick` is right when you are **drawing pills at random to make a new seed**, and wrong when you are **reading a backup you already have**. Reading a backup, the word is whichever one is really printed, and a neighbour of it is somebody else's wallet. The output looks identical either way, which is why the flag is opt-in.
 
-Drawing at random and then picking at random does not skew the result: each pill in the bag is equally likely, and the words that share a set of letters are exactly as many as the pills that show it, so every one of the 2048 words stays equally likely.
+`--pick` only draws when the letters are not a word themselves — say a four-letter print worn down to three. Then drawing a pill at random and picking at random does not skew the result: the pills whose prints start with those letters are exactly the words that do, so every one of the 2048 words stays equally likely. When the letters *are* a word, that word is the only pill that prints them, so `--pick` takes it and says so; drawing there would hand most of that pill's chance to the longer words it starts.
 
 Like the other phrase tools, the letters are never taken as a command-line argument — that would leave a word of your seed in your shell history. Pass `--stdin` to pipe them in, one set per line:
 
